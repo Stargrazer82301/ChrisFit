@@ -1,21 +1,8 @@
-# Identify location
-import socket
-location = socket.gethostname()
-if location == 'Monolith':
-    dropbox = 'E:\\Users\\Chris\\Dropbox\\'
-if location == 'hobbitslayer':
-    dropbox = 'C:\\Users\\spx7cjc\\Dropbox\\'
-if location == 'Frodo':
-    dropbox = '/home/user/spx7cjc/Desktop/Herdata/Dropbox/'
-    print 'Ha, you\'re using Frodo! Sucker!'
-
 # Import smorgasbord
 import sys
 import os
-#for dropbox in ['E:\\Users\\Chris\\Dropbox\\', 'C:\\Users\\spx7cjc\\Dropbox\\', '/home/user/spx7cjc/Desktop/Herdata/Dropbox/']:
-sys.path.append(dropbox+'Work\\Scripts\\')
-sys.path.append(dropbox+'Work\\Scripts\\ChrisFit')
 current_module = sys.modules[__name__]
+sys.path.append(str(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]))
 import pdb
 import numpy as np
 import scipy
@@ -395,7 +382,7 @@ def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, 
         ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( fluxes_plot[det] + errors_plot[det] ) ) ) )
         ax.set_ylim(ylim_min,ylim_max)
 
-        # Save figures to 'Output' folder
+        # Save figures to designated'Output' folder
         comp_strings = ['Eh', 'One', 'Two']
         if output_dir==False:
             if not os.path.exists('Output'):
@@ -722,27 +709,3 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
 
 
 
-
-
-
-"""
-# Package parameters for initial fit
-params = lmfit.Parameters()
-params.add('beta', value=beta, vary=beta_boolean)
-params.add('D', value=distance, vary=False)
-params.add('lambda_0', value=lambda_0, vary=False)
-params.add('kappa_0', value=kappa_0, vary=False)
-params.add('components', value=components, vary=False, min=1, max=2)
-if warm_boolean==False:
-    params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
-    params.add('T_w', value=0, vary=False)
-    params.add('M_c', value=1E6, vary=True, min=1E4)
-    params.add('M_w', value=0, vary=False)
-elif warm_boolean==True:
-    params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
-    params.add('T_offset', value=30.0, vary=True, min=0.0, max=200.0)
-    params.add('T_w', expr='T_c + T_offset')
-    params.add('M_c', value=1E6, vary=True, min=1E4)
-    params.add('M_ratio', value=1E-2, vary=True, min=1E-6, max=100.0)
-    params.add('M_w', expr='M_c * M_ratio')
-"""
