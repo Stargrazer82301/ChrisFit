@@ -27,19 +27,38 @@ k = 1.38E-23
 
 # Function to perform a optionally-colour-corrected, optionally-bootstrapped, optionally-plotted, one- or two-component modified blackbody fit to a set of fluxes
 # Input: Name of source, array of wavelengths (m), array of fluxes (Jy), array of uncertainties (Jy), list of camera used at each band
-    # number of greybody components to fit, distance (pc), array of booleans stating whether points are upper limits, beta value if fixed or 'free' if free, kappa_0 (m^2 kg^-1), lambda_0 (m), redshift,
-    # boolen for whether to colour-correct (if so, colour-correction datfiles required), boolen for whether to output plot (if so, plots written to subdir called 'Output'),
+    # number of greybody components to fit, distance (pc), array of booleans stating whether points are upper limits, beta value if fixed or 'free' if free, kappa_0 (m^2 kg^-1), lambda_0 (m), initial guess for dust mass (Msol) (else boolean default),
+    # redshift, boolen for whether to colour-correct (if so, colour-correction datfiles required), boolen for whether to output plot (if so, plots written to subdir called 'Output'),
     # boolean for whether to bootstrap for errors, boolean for verbosity, string of name of scipy minimisation algorithm to use, string of output directory or boolean of default, value for percentile uncertainties or boolean of default
 # Output: List of [chi-squared, list of [cold dust temp, cold dust mass, warm dust temp, warm dust mass, total dust mass, beta], list of [cold dust temp err, cold dust mass err, warm dust temp err, warm dust mass err, total dust mass err, beta err],
     # corrected fluxes, list of residuals, list of plot [fig, ax], list of [cold dust temp median, cold dust mass median, warm dust temp median, warm dust mass median, total dust mass median, beta median],
     # list of [cold dust temp boostrapped values, cold dust mass boostrapped values, warm dust temp boostrapped values, warm dust mass boostrapped values, total dust mass boostrapped values, beta boostrapped values],
     # list of [lower confidence interval, upper confidence interval] for [cold dust temp, cold dust mass, warm dust temp, warm dust mass, total dust mass, beta]]
-def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, distance, limits=[False], beta=2.0, kappa_0=0.077, lambda_0=850E-6, redshift=0.0, col_corr=True, plotting=True, bootstrapping=False, verbose=True, algorithm='leastsq', output_dir=False, percentile=False):
+def ChrisFit(source_name, wavelengths, 
+             fluxes, errors, 
+             instruments, 
+             components, 
+             distance, 
+             limits = [False],
+             beta = 2.0,
+             kappa_0 = 0.077,
+             lambda_0 = 850E-6,
+             guess_mass = False,
+             redshift = 0.0,
+             col_corr = True,
+             plotting = True,
+             bootstrapping = False,
+             verbose = True,
+             algorithm = 'leastsq',
+             output_dir = False,
+             percentile = False):
+                 
+                 
+           
+    # Announce the name of the source being processed
     if verbose==True:
         print ' '
         print 'Fitting source: '+str(source_name)
-
-
 
     # Set boolean depending upon number of components in fit
     if components==1:
@@ -60,8 +79,11 @@ def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, 
     fluxes = np.array(fluxes)
     errors = np.array(errors)
 
-    # Crudely estimate sensible initial guess for dust mass
-    M_c_guess = 5E-9 * distance**2.0
+    # Use provided guess mass, or crudely estimate sensible initial guess for dust mass
+    if guess_mass!=False:
+        M_c_guess = float(guess_mass)
+    else:
+        guess_mass = 5E-9 * distance**2.0
 
     # Package parameters for initial fit
     params = lmfit.Parameters()
@@ -720,4 +742,5 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
 
 
 #data = np.array([2.795583251953125000e+03, 6.821301269531250000e+03, 2.734590332031250000e+03, 7.011021118164062500e+02, 1.355904998779296875e+02])
-#ChrisFit('Test Pixel', [70E-6,160E-6,250E-6,350E-6,500E-6], data, data*0.12, ['PACS','PACS','SPIRE','SPIRE','SPIRE'], 1, 1.0, limits=[False], beta='free', kappa_0=0.077, lambda_0=850E-6, redshift=0.0, col_corr=True, plotting=True, bootstrapping=False, verbose=True, algorithm='powell', output_dir=False, percentile=False)
+#data = data/1000.0
+#ChrisFit('Test Pixel', [70E-6,160E-6,250E-6,350E-6,500E-6], data, data*0.12, ['PACS','PACS','SPIRE','SPIRE','SPIRE'], 2, 1.0, limits=[False], beta='free', kappa_0=0.077, lambda_0=850E-6, guess_mass=10.0**-8, redshift=0.0, col_corr=True, plotting=True, bootstrapping=False, verbose=True, algorithm='leastsq', output_dir=False, percentile=False)
