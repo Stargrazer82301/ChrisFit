@@ -86,7 +86,10 @@ def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, 
     # Perform initial, using LMfit
     if verbose==True:
         print 'Performing initial fit...'
-    result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
+    if algorithm=='leastsq':
+        result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
+    else:
+        result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors, limits), method=algorithm)
 
 
 
@@ -105,8 +108,11 @@ def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, 
             #print 'Band: '+str(1E6*wavelengths[w])+' Correction: '+str(100.0*(1.0-(1.0/corr_output[0])))
 
         # Perform colour-corrected fit, using LMfit
-        lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
-
+        if algorithm=='leastsq':
+            result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
+        else:
+            result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm)
+            
 
 
     # Extract best-fit values, and make sure that warm and cold components are ordered correctly
@@ -197,7 +203,10 @@ def ChrisFit(source_name, wavelengths, fluxes, errors, instruments, components, 
                 bs_params.add('M_w', expr='M_c * M_ratio')
 
             # Perform bootstrap fit
-            bs_result = lmfit.minimize(ChrisFit_2GB_LMfit, bs_params, args=(wavelengths, bs_fluxes, errors, limits), method=algorithm, maxfev=1000, xtol=2E-9, ftol=2E-9)
+            if algorithm=='leastsq':
+                bs_result = lmfit.minimize(ChrisFit_2GB_LMfit, bs_params, args=(wavelengths, bs_fluxes, errors, limits), method=algorithm, maxfev=1000, xtol=2E-9, ftol=2E-9)
+            else:
+                bs_result = lmfit.minimize(ChrisFit_2GB_LMfit, bs_params, args=(wavelengths, bs_fluxes, errors, limits), method=algorithm)
 
             # Retrieve output values, and ensure they are in correct order
             bs_T_order, bs_M_order = np.array([bs_result.params['T_w'].value, bs_result.params['T_c'].value]), np.array([bs_result.params['M_w'].value, bs_result.params['M_c'].value])
@@ -528,7 +537,8 @@ def ChrisFit_2GB_LMfit(params, wavelengths, fluxes, errors, limits=[False]):
 def ChrisFit_2GB_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments, limits=[False]):
 
     # Perform initial fit, to produce colour-corrected fluxes
-    lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors), method='powell')
+    corr_result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors), method='powell')
+    params = corr_result.params
 
     # Loop over each wavelength, and use initial fit to colour-correct fluxes
     fluxes_corr = np.empty([wavelengths.shape[0]])
@@ -615,7 +625,8 @@ def ChrisFit_2GB_Omega_LMfit(params, wavelengths, fluxes, errors, limits=[False]
 def ChrisFit_2GB_Omega_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments, limits=False):
 
     # Perform initial fit, to produce colour-corrected fluxes
-    lmfit.minimize(ChrisFit_2GB_Omega_LMfit, params, args=(wavelengths, fluxes, errors), method='powell')
+    corr_result = lmfit.minimize(ChrisFit_2GB_Omega_LMfit, params, args=(wavelengths, fluxes, errors), method='powell')
+    params = corr_result.params
 
     # Loop over each wavelength, and use initial fit to colour-correct fluxes
     fluxes_corr = np.empty([wavelengths.shape[0]])
@@ -708,4 +719,5 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
     return divisor, index
 
 
-
+#data = np.array([2.795583251953125000e+03, 6.821301269531250000e+03, 2.734590332031250000e+03, 7.011021118164062500e+02, 1.355904998779296875e+02])
+#ChrisFit('Test Pixel', [70E-6,160E-6,250E-6,350E-6,500E-6], data, data*0.12, ['PACS','PACS','SPIRE','SPIRE','SPIRE'], 1, 1.0, limits=[False], beta='free', kappa_0=0.077, lambda_0=850E-6, redshift=0.0, col_corr=True, plotting=True, bootstrapping=False, verbose=True, algorithm='powell', output_dir=False, percentile=False)
