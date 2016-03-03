@@ -34,11 +34,11 @@ k = 1.38E-23
     # corrected fluxes, list of residuals, list of plot [fig, ax], list of [cold dust temp median, cold dust mass median, warm dust temp median, warm dust mass median, total dust mass median, beta median],
     # list of [cold dust temp boostrapped values, cold dust mass boostrapped values, warm dust temp boostrapped values, warm dust mass boostrapped values, total dust mass boostrapped values, beta boostrapped values],
     # list of [lower confidence interval, upper confidence interval] for [cold dust temp, cold dust mass, warm dust temp, warm dust mass, total dust mass, beta]]
-def ChrisFit(source_name, wavelengths, 
-             fluxes, errors, 
-             instruments, 
-             components, 
-             distance, 
+def ChrisFit(source_name, wavelengths,
+             fluxes, errors,
+             instruments,
+             components,
+             distance,
              limits = [False],
              beta = 2.0,
              kappa_0 = 0.077,
@@ -52,9 +52,9 @@ def ChrisFit(source_name, wavelengths,
              algorithm = 'leastsq',
              output_dir = False,
              percentile = False):
-                 
-                 
-           
+
+
+
     # Announce the name of the source being processed
     if verbose==True:
         print ' '
@@ -83,7 +83,7 @@ def ChrisFit(source_name, wavelengths,
     if guess_mass!=False:
         M_c_guess = float(guess_mass)
     else:
-        guess_mass = 5E-9 * distance**2.0
+        M_c_guess = 5E-9 * distance**2.0
 
     # Package parameters for initial fit
     params = lmfit.Parameters()
@@ -134,7 +134,7 @@ def ChrisFit(source_name, wavelengths,
             result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
         else:
             result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm)
-            
+
 
 
     # Extract best-fit values, and make sure that warm and cold components are ordered correctly
