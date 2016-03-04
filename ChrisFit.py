@@ -56,9 +56,6 @@ def ChrisFit(source_name, wavelengths,
 
 
 
-    # Set location of ChrisFuncs.py to be current working directory
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
     # Announce the name of the source being processed
     if verbose==True:
         print ' '
@@ -131,7 +128,7 @@ def ChrisFit(source_name, wavelengths,
         for w in range(0, wavelengths.shape[0]):
             corr_output = ChrisFit_ColourCorrection(wavelengths[w], instruments[w], result.params['T_w'].value, result.params['T_c'].value, result.params['M_w'].value, result.params['M_c'].value, beta=result.params['beta'].value)
             fluxes_corr[w] = fluxes[w] / corr_output[0]
-            #print 'Band: '+str(1E6*wavelengths[w])+' Correction: '+str(100.0*(1.0-(1.0/corr_output[0])))
+            #print 'Band: '+str(1E6*wavelengths[w])+'um;   Correction: '+str(100.0*(1.0-(1.0/corr_output[0])))[:6]+'%'
 
         # Perform colour-corrected fit, using LMfit
         if algorithm=='leastsq':
@@ -698,6 +695,10 @@ def ChrisFit_2GB_Omega_ColCorr_LMfit(params, wavelengths, fluxes, errors, instru
 # Output: Colour-correction divisor
 def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2.0, verbose=True):
 
+    # Set location of ChrisFuncs.py to be current working directory
+    old_cwd = os.getcwd()
+    os.chdir(str(os.path.dirname(os.path.realpath(__file__))))
+
     # Identify instrument and wavelength, and read in corresponding colour-correction data
     unknown = False
     try:
@@ -718,6 +719,7 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
     if unknown==True:
         divisor = 1.0
         index = np.NaN
+        pdb.set_trace()
     elif unknown==False:
 
         # Calculate relative flux at wavelengths at points 1 um to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
@@ -741,6 +743,8 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
         else:
             divisor = interp.__call__(index)
 
+    # Restore old cwd, and return results
+    os.chdir(old_cwd)
     return divisor, index
 
 
