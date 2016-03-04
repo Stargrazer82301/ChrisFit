@@ -3,6 +3,7 @@ import sys
 import os
 current_module = sys.modules[__name__]
 sys.path.append(str(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]))
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import pdb
 import numpy as np
 import scipy
@@ -55,6 +56,9 @@ def ChrisFit(source_name, wavelengths,
 
 
 
+    # Set location of ChrisFuncs.py to be current working directory
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
     # Announce the name of the source being processed
     if verbose==True:
         print ' '
@@ -102,7 +106,7 @@ def ChrisFit(source_name, wavelengths,
         params.add('T_offset', value=30.0, vary=True, min=0.0, max=50.0)
         params.add('T_w', expr='T_c + T_offset')
         params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E4)
-        params.add('M_ratio', value=1E-2, vary=True, min=1E-6, max=100.0)
+        params.add('M_ratio', value=1E-2, vary=True, min=1E-6, max=1E4)
         params.add('M_w', expr='M_c * M_ratio')
 
     # Perform initial, using LMfit
@@ -131,15 +135,15 @@ def ChrisFit(source_name, wavelengths,
 
         # Perform colour-corrected fit, using LMfit
         if algorithm=='leastsq':
-            result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
+            result = lmfit.minimize(ChrisFit_2GB_LMfit, result.params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
         else:
-            result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm)
+            result = lmfit.minimize(ChrisFit_2GB_LMfit, result.params, args=(wavelengths, fluxes_corr, errors, limits), method=algorithm)
 
 
 
     # Extract best-fit values, and make sure that warm and cold components are ordered correctly
     beta = result.params['beta'].value
-    T_order, M_both = np.array([result.params['T_w'].value, result.params['T_c'].value]), np.array([params['M_w'].value, result.params['M_c'].value])
+    T_order, M_both = np.array([result.params['T_w'].value, result.params['T_c'].value]), np.array([result.params['M_w'].value, result.params['M_c'].value])
     if components==1:
         T_w = np.min(T_order)
         T_c = np.max(T_order)
@@ -550,7 +554,6 @@ def ChrisFit_2GB_LMfit(params, wavelengths, fluxes, errors, limits=[False]):
     # Adjust chi-squared to account for limits
     if (True in limits)==True:
         chi_squared[ np.where( (np.array(limits)==True) & (fit-fluxes<0) ) ] = 0.0
-
     return chi_squared
 
 # Function to calculate the chi-sqiared between a set of fluxes to be colour-corrected and a two-component modified blackbody using the LMfit package
@@ -701,7 +704,7 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
         try:
             data_table = np.genfromtxt('Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
         except:
-            data_table = np.genfromtxt('ChrisFit\\Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
+            data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument+'.csv'), delimiter=',', names=True)
         data_index = data_table['alpha']
         data_column = 'K'+str(int((wavelength*1E6)))
         data_factor = data_table[data_column]
