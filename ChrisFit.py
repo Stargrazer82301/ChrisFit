@@ -47,6 +47,7 @@ def ChrisFit(source_name, wavelengths,
              guess_mass = False,
              redshift = 0.0,
              col_corr = True,
+             min_temp = 5.0,
              plotting = True,
              bootstrapping = False,
              verbose = True,
@@ -94,12 +95,12 @@ def ChrisFit(source_name, wavelengths,
     params.add('kappa_0', value=kappa_0, vary=False)
     params.add('components', value=components, vary=False, min=1, max=2)
     if warm_boolean==False:
-        params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
+        params.add('T_c', value=20.0, vary=True, min=10.0, max=200.0)
         params.add('T_w', value=0, vary=False)
         params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
         params.add('M_w', value=0, vary=False)
     elif warm_boolean==True:
-        params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
+        params.add('T_c', value=20.0, vary=True, min=min_temp, max=200.0)
         params.add('T_offset', value=30.0, vary=True, min=0.0, max=50.0)
         params.add('T_w', expr='T_c + T_offset')
         params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E4)
@@ -213,12 +214,12 @@ def ChrisFit(source_name, wavelengths,
             bs_params.add('kappa_0', value=kappa_0, vary=False)
             bs_params.add('components', value=components, vary=False, min=1, max=2)
             if warm_boolean==False:
-                bs_params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
+                bs_params.add('T_c', value=20.0, vary=True, min=10.0, max=200.0)
                 bs_params.add('T_w', value=0, vary=False)
                 bs_params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
                 bs_params.add('M_w', value=0, vary=False)
             elif warm_boolean==True:
-                bs_params.add('T_c', value=20.0, vary=True, min=5.0, max=200.0)
+                bs_params.add('T_c', value=20.0, vary=True, min=min_temp, max=200.0)
                 bs_params.add('T_offset', value=30.0, vary=True, min=10.0, max=50.0)
                 bs_params.add('T_w', expr='T_c + T_offset')
                 bs_params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
