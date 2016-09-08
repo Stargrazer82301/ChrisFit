@@ -35,20 +35,23 @@ k = 1.38E-23
     # corrected fluxes, list of residuals, list of plot [fig, ax], list of [cold dust temp median, cold dust mass median, warm dust temp median, warm dust mass median, total dust mass median, beta median],
     # list of [cold dust temp boostrapped values, cold dust mass boostrapped values, warm dust temp boostrapped values, warm dust mass boostrapped values, total dust mass boostrapped values, beta boostrapped values],
     # list of [lower confidence interval, upper confidence interval] for [cold dust temp, cold dust mass, warm dust temp, warm dust mass, total dust mass, beta]]
-def ChrisFit(source_name, wavelengths,
-             fluxes, errors,
+def ChrisFit(source_name,
+             wavelengths,
+             fluxes,
+             errors,
              instruments,
              components,
              distance,
              limits = [False],
              beta = 2.0,
-             kappa_0 = 0.077,
-             lambda_0 = 850E-6,
+             kappa_0 = 0.051,
+             lambda_0 = 500E-6,
              guess_mass = False,
              redshift = 0.0,
              col_corr = True,
              min_temp = 5.0,
              plotting = True,
+             plot_pdf = True,
              bootstrapping = False,
              verbose = True,
              algorithm = 'leastsq',
@@ -63,6 +66,7 @@ def ChrisFit(source_name, wavelengths,
         print 'Fitting source: '+str(source_name)
 
     # Set boolean depending upon number of components in fit
+    components = int(components)
     if components==1:
         warm_boolean = False
     elif components==2:
@@ -182,7 +186,7 @@ def ChrisFit(source_name, wavelengths,
         if verbose==True:
             print ' '
             print 'Bootstrapping fit...'
-        if bool(bootstrapping)==True and bootstrapping==True:
+        if str(bootstrapping)=='True':
             bs_iter = 1000
             bootstrapping = True
         else:
@@ -328,7 +332,7 @@ def ChrisFit(source_name, wavelengths,
         ax = fig.add_axes([0.125, 0.125, 0.825, 0.825])
 
         # Generate fit components
-        fit_wavelengths = np.linspace(10E-6, 1000E-6, num=5000)
+        fit_wavelengths = np.linspace(10E-6, 10000E-6, num=10000)
         fit_fluxes_w = ChrisFit_2GB_Flux(fit_wavelengths, T_w, 0.0, M_w, 0.0, distance, kappa_0=kappa_0, lambda_0=lambda_0, beta=beta)
         fit_fluxes_c = ChrisFit_2GB_Flux(fit_wavelengths, 0.0, T_c, 0.0, M_c, distance, kappa_0=kappa_0, lambda_0=lambda_0, beta=beta)
         fit_fluxes_tot = ChrisFit_2GB_Flux(fit_wavelengths, T_w, T_c, M_w, M_c, distance, kappa_0=kappa_0, lambda_0=lambda_0, beta=beta)
@@ -382,7 +386,6 @@ def ChrisFit(source_name, wavelengths,
         ax.set_yscale('log')
         ax.set_xlabel(r'Wavelength ($\mu$m)', fontsize=17.5, fontname=font_family)
         ax.set_ylabel('Flux Density (Jy)', fontsize=17.5, fontname=font_family)
-        ax.set_xlim(1E1,1E3)
 
         # Format font of tick labels
         for xlabel in ax.get_xticklabels():
@@ -410,6 +413,11 @@ def ChrisFit(source_name, wavelengths,
             ax.errorbar(wavelengths[lim_false]*1E6, fluxes_plot[lim_false], yerr=[errors_down[lim_false], errors_up[lim_false]], ecolor='black', elinewidth=1.15, capthick=1.15, marker='x', color='black', markersize=5.0, markeredgewidth=1.15, linewidth=0)
             ax.errorbar(wavelengths[lim_true]*1E6, fluxes_plot[lim_true], yerr=[errors_down[lim_true], errors_up[lim_true]], ecolor='gray', elinewidth=1.15, capthick=1.15, marker='x', color='gray', markersize=5.0, markeredgewidth=1.15, linewidth=0)
 
+        # Scale x-axes to account for wavelengths provided
+        xlim_min = 1E6 * 10.0**( np.floor( np.log10( np.min( wavelengths ) ) ) )
+        xlim_max = 1E6 * 10.0**( np.ceil( np.log10( np.max( wavelengths ) ) ) )
+        ax.set_xlim(xlim_min,xlim_max)
+
         # Scale y-axes to account for range of values and non-detections
         ylim_min = 10.0**( -1.0 + np.round( np.log10( np.min( fluxes_plot[det] - errors_plot[det] ) ) ) )
         ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( fluxes_plot[det] + errors_plot[det] ) ) ) )
@@ -421,10 +429,12 @@ def ChrisFit(source_name, wavelengths,
             if not os.path.exists('Output'):
                 os.mkdir('Output')
             fig.savefig( os.path.join('Output',source_name+' '+comp_strings[components]+' Component.png'), dpi=175.0 )
-            fig.savefig( os.path.join('Output',source_name+' '+comp_strings[components]+' Component.pdf') )
+            if plot_pdf==True:
+                fig.savefig( os.path.join('Output',source_name+' '+comp_strings[components]+' Component.pdf') )
         if output_dir!=False:
             fig.savefig( os.path.join(output_dir,source_name+' '+comp_strings[components]+' Component.png'), dpi=175.0 )
-            fig.savefig( os.path.join(output_dir,source_name+' '+comp_strings[components]+' Component.pdf') )
+            if plot_pdf==True:
+                fig.savefig( os.path.join(output_dir,source_name+' '+comp_strings[components]+' Component.pdf') )
 
 
 
@@ -720,7 +730,6 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
     if unknown==True:
         divisor = 1.0
         index = np.NaN
-        pdb.set_trace()
     elif unknown==False:
 
         # Calculate relative flux at wavelengths at points 1 um to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
