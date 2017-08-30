@@ -1,6 +1,12 @@
 # Import smorgasbord
+from __future__ import division
+from __future__ import print_function
 import sys
 import os
+if sys.version_info[0] >= 3:
+    from builtins import str
+    from builtins import range
+    from past.utils import old_div
 current_module = sys.modules[__name__]
 sys.path.append(str(os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]))
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -62,8 +68,8 @@ def ChrisFit(source_name,
 
     # Announce the name of the source being processed
     if verbose==True:
-        print ' '
-        print 'Fitting source: '+str(source_name)
+        print(' ')
+        print('Fitting source: '+str(source_name))
 
     # Set boolean depending upon number of components in fit
     components = int(components)
@@ -101,19 +107,19 @@ def ChrisFit(source_name,
     if warm_boolean==False:
         params.add('T_c', value=20.0, vary=True, min=10.0, max=200.0)
         params.add('T_w', value=0, vary=False)
-        params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
+        params.add('M_c', value=M_c_guess, vary=True, min=np.divide(M_c_guess,1E6))
         params.add('M_w', value=0, vary=False)
     elif warm_boolean==True:
         params.add('T_c', value=20.0, vary=True, min=min_temp, max=200.0)
         params.add('T_offset', value=30.0, vary=True, min=0.0, max=50.0)
         params.add('T_w', expr='T_c + T_offset')
-        params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E4)
+        params.add('M_c', value=M_c_guess, vary=True, min=np.divide(M_c_guess,1E4))
         params.add('M_ratio', value=1E-2, vary=True, min=1E-6, max=1E4)
         params.add('M_w', expr='M_c * M_ratio')
 
     # Perform initial, using LMfit
     if verbose==True:
-        print 'Performing initial fit...'
+        print('Performing initial fit...')
     if algorithm=='leastsq':
         result = lmfit.minimize(ChrisFit_2GB_LMfit, params, args=(wavelengths, fluxes, errors, limits), method=algorithm, maxfev=1000000, xtol=1E-14, ftol=1E-14)
     else:
@@ -126,13 +132,13 @@ def ChrisFit(source_name,
         fluxes_corr = np.copy(fluxes)
     if col_corr==True:
         if verbose==True:
-            print 'Performing colour-corrected fit...'
+            print('Performing colour-corrected fit...')
 
         # Loop over each wavelength, and use initial fit to colour-correct fluxes
         fluxes_corr = np.empty([wavelengths.shape[0]])
         for w in range(0, wavelengths.shape[0]):
             corr_output = ChrisFit_ColourCorrection(wavelengths[w], instruments[w], result.params['T_w'].value, result.params['T_c'].value, result.params['M_w'].value, result.params['M_c'].value, beta=result.params['beta'].value)
-            fluxes_corr[w] = fluxes[w] / corr_output[0]
+            fluxes_corr[w] = np.divide(fluxes[w], corr_output[0])
             #print 'Band: '+str(1E6*wavelengths[w])+'um;   Correction: '+str(100.0*(1.0-(1.0/corr_output[0])))[:6]+'%'
 
         # Perform colour-corrected fit, using LMfit
@@ -159,18 +165,18 @@ def ChrisFit(source_name,
         M_c = M_both[ np.where( T_order==T_c ) ][0]
         M_d = M_w + M_c
     if verbose==True:
-        print ' '
-        print 'Best-fit cold dust temp of: '+str(T_c)[0:5]+' K'
-        print 'Best-fit cold dust mass of: '+str(np.log10(M_c))[0:5]+' log10 Msol'
+        print(' ')
+        print('Best-fit cold dust temp of: '+str(T_c)[0:5]+' K')
+        print('Best-fit cold dust mass of: '+str(np.log10(M_c))[0:5]+' log10 Msol')
         if components==2:
-            print 'Best-fit warm dust temp of: '+str(T_w)[0:5]+' K'
-            print 'Best-fit warm dust mass of: '+str(np.log10(M_w))[0:5]+' log10 Msol'
+            print('Best-fit warm dust temp of: '+str(T_w)[0:5]+' K')
+            print('Best-fit warm dust mass of: '+str(np.log10(M_w))[0:5]+' log10 Msol')
         if beta=='free':
-            print 'Best-fit beta of: '+str(beta)[0:4]
+            print('Best-fit beta of: '+str(beta)[0:4])
 
     # Calculate chi-squared of fit
     fit = ChrisFit_2GB_Flux(wavelengths, T_w, T_c, M_w, M_c, distance, kappa_0=kappa_0, lambda_0=lambda_0, beta=beta)
-    chi_squared = ( (fluxes_corr-fit)**2.0 / errors**2.0 )
+    chi_squared = ( np.divide((fluxes_corr-fit)**2.0, errors**2.0) )
     if (True in limits)==True:
         chi_squared[ np.where( (np.array(limits)==True) & (fit-fluxes<0) ) ] = 0.0
 
@@ -184,8 +190,8 @@ def ChrisFit(source_name,
     # Commence bootstrapping, if required
     if bootstrapping!=False:
         if verbose==True:
-            print ' '
-            print 'Bootstrapping fit...'
+            print(' ')
+            print('Bootstrapping fit...')
         if str(bootstrapping)=='True':
             bs_iter = 1000
             bootstrapping = True
@@ -203,7 +209,7 @@ def ChrisFit(source_name,
         for b in range(0, bs_iter):
             if np.mod(b, 100)==0:
                 if verbose==True:
-                    print 'Bootstrap iterations: '+str(b)+' - '+str(b+100)
+                    print('Bootstrap iterations: '+str(b)+' - '+str(b+100))
 
             # Peturb corrected fluxes within errors
             bs_fluxes = np.copy(fluxes_corr)
@@ -220,13 +226,13 @@ def ChrisFit(source_name,
             if warm_boolean==False:
                 bs_params.add('T_c', value=20.0, vary=True, min=10.0, max=200.0)
                 bs_params.add('T_w', value=0, vary=False)
-                bs_params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
+                bs_params.add('M_c', value=M_c_guess, vary=True, min=np.divide(M_c_guess,1E6))
                 bs_params.add('M_w', value=0, vary=False)
             elif warm_boolean==True:
                 bs_params.add('T_c', value=20.0, vary=True, min=min_temp, max=200.0)
                 bs_params.add('T_offset', value=30.0, vary=True, min=10.0, max=50.0)
                 bs_params.add('T_w', expr='T_c + T_offset')
-                bs_params.add('M_c', value=M_c_guess, vary=True, min=M_c_guess/1E6)
+                bs_params.add('M_c', value=M_c_guess, vary=True, min=np.divide(M_c_guess,1E6))
                 bs_params.add('M_ratio', value=1E-2, vary=True, min=1E-6, max=1.0)
                 bs_params.add('M_w', expr='M_c * M_ratio')
 
@@ -287,30 +293,30 @@ def ChrisFit(source_name,
 
         # Calculate uncertainties as a percentile, if requested
         if percentile>0:
-            bs_T_w_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_T_w_array) - T_w ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_T_w_array).shape[0] ) ]
-            bs_T_c_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_T_c_array) - T_c ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_T_c_array).shape[0] ) ]
-            bs_M_w_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_w_array) - M_w ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_M_w_array).shape[0] ) ]
-            bs_M_c_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_c_array) - M_c ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_M_c_array).shape[0] ) ]
-            bs_beta_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_beta_array) - beta ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_beta_array).shape[0] ) ]
+            bs_T_w_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_T_w_array) - T_w ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_T_w_array).shape[0] ) ]
+            bs_T_c_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_T_c_array) - T_c ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_T_c_array).shape[0] ) ]
+            bs_M_w_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_w_array) - M_w ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_M_w_array).shape[0] ) ]
+            bs_M_c_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_c_array) - M_c ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_M_c_array).shape[0] ) ]
+            bs_beta_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_beta_array) - beta ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_beta_array).shape[0] ) ]
             if components==1:
                 bs_M_d_sigma = bs_M_c_sigma
             elif components==2:
                 bs_M_d_array = bs_M_w_array + bs_M_c_array
-                bs_M_d_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_d_array) - M_d ) ) )[ int( (float(percentile)/100.0) * ChrisFuncs.Nanless(bs_M_d_array).shape[0] ) ]
-            bs_M_w_sigma_log = np.log10( ( bs_M_w_sigma + M_w ) / M_w )
-            bs_M_c_sigma_log = np.log10( ( bs_M_c_sigma + M_c ) / M_c )
-            bs_M_d_sigma_log = np.log10( ( bs_M_d_sigma + M_d ) / M_d )
+                bs_M_d_sigma = ( np.sort( np.abs( ChrisFuncs.Nanless(bs_M_d_array) - M_d ) ) )[ int( (np.divide(float(percentile),100.0)) * ChrisFuncs.Nanless(bs_M_d_array).shape[0] ) ]
+            bs_M_w_sigma_log = np.log10( np.divide(( bs_M_w_sigma + M_w ), M_w) )
+            bs_M_c_sigma_log = np.log10( np.divide(( bs_M_c_sigma + M_c ), M_c) )
+            bs_M_d_sigma_log = np.log10( np.divide(( bs_M_d_sigma + M_d ), M_d) )
 
         # Reporty uncertainties
         if verbose==True:
-            print ' '
-            print 'Cold dust temp uncertainty of: '+str(bs_T_c_sigma)[0:5]+' K'
-            print 'Cold dust mass uncertainty of: '+str(bs_M_c_sigma_log)[0:5]+' log10 Msol'
+            print(' ')
+            print('Cold dust temp uncertainty of: '+str(bs_T_c_sigma)[0:5]+' K')
+            print('Cold dust mass uncertainty of: '+str(bs_M_c_sigma_log)[0:5]+' log10 Msol')
             if components==2:
-                print 'Warm dust temp uncertainty of: '+str(bs_T_w_sigma)[0:5]+' K'
-                print 'Warm dust mass uncertainty of: '+str(bs_M_w_sigma_log)[0:5]+' log10 Msol'
+                print('Warm dust temp uncertainty of: '+str(bs_T_w_sigma)[0:5]+' K')
+                print('Warm dust mass uncertainty of: '+str(bs_M_w_sigma_log)[0:5]+' log10 Msol')
             if beta=='free':
-                print 'Beta uncertainty of: '+str(bs_beta_sigma)[0:4]
+                print('Beta uncertainty of: '+str(bs_beta_sigma)[0:4])
 
     # Return NaN values if bootstrapping not requested
     elif bootstrapping==False:
@@ -445,8 +451,8 @@ def ChrisFit(source_name,
         bs_T_w_sigma = np.NaN
         bs_M_w_sigma = np.NaN
     if verbose==True:
-        print ' '
-        print ' '
+        print(' ')
+        print(' ')
     return chi_squared,\
     [T_c, M_c, T_w, M_w, M_d, beta],\
     [bs_T_c_sigma, bs_M_c_sigma_log, bs_T_w_sigma, bs_M_w_sigma_log, bs_M_d_sigma_log, bs_beta_sigma],\
@@ -464,24 +470,24 @@ def ChrisFit(source_name,
 # Function to calculate flux at a given wavelength of a two-component modified blackbody
 # Input: Wavelength (m), warm dust temperature (K), cold dust temperature (K), warm dust mass (Msol), cold dust mass (Msol), distance (pc), kappa_0, lambda_0, beta
 # Returns: Flux (Jy) at wavelength in question
-def ChrisFit_2GB_Flux(wavelength, T_w, T_c, M_w, M_c, D, kappa_0=0.077, lambda_0=850E-6, beta=2.0):
+def ChrisFit_2GB_Flux(wavelength, T_w, T_c, M_w, M_c, D, kappa_0=0.051, lambda_0=500E-6, beta=2.0):
 
     # Convert wavelength to frequency, and find kappa
-    nu = c / wavelength
-    nu_0 = c / lambda_0
-    kappa_nu = kappa_0 * ( nu / nu_0 )**beta
+    nu = np.divide(c, wavelength)
+    nu_0 = np.divide(c, lambda_0)
+    kappa_nu = kappa_0 * ( np.divide(nu, nu_0) )**beta
 
     # Evaluate hot dust Planck function
     if T_w>0:
-        B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-        B_w_e = (h * nu) / (k * T_w)
+        B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+        B_w_e = np.divide((h * nu), (k * T_w))
         B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
     else:
         B_w = 0.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate flux
@@ -498,19 +504,19 @@ def ChrisFit_2GB_Flux(wavelength, T_w, T_c, M_w, M_c, D, kappa_0=0.077, lambda_0
 def ChrisFit_2GB_Omega_Flux(wavelength, T_w, T_c, Omega_w, Omega_c, beta=2.0):
 
     # Convert wavelength to frequency
-    nu = c / wavelength
+    nu = np.divide(c, wavelength)
 
     # Evaluate hot dust Planck function
     if T_w>0:
-        B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-        B_w_e = (h * nu) / (k * T_w)
+        B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+        B_w_e = np.divide((h * nu), (k * T_w))
         B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
     else:
         B_w = 0.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate flux
@@ -538,18 +544,18 @@ def ChrisFit_2GB_LMfit(params, wavelengths, fluxes, errors, limits=[False]):
     beta = params['beta'].value
 
     # Convert wavelength to frequency, and find kappa
-    nu = c / wavelengths
-    nu_0 = c / lambda_0
-    kappa_nu = kappa_0 * ( nu / nu_0 )**beta
+    nu = np.divide(c, wavelengths)
+    nu_0 = np.divide(c, lambda_0)
+    kappa_nu = kappa_0 * ( np.divide(nu, nu_0) )**beta
 
     # Evaluate hot dust Planck function
-    B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_w_e = (h * nu) / (k * T_w)
+    B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_w_e = np.divide((h * nu), (k * T_w))
     B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate fluxes of fit, and find chi_squared
@@ -557,7 +563,7 @@ def ChrisFit_2GB_LMfit(params, wavelengths, fluxes, errors, limits=[False]):
     M_c_kilograms = M_c * 2E30
     D_metres = D * 3.26 * 9.5E15
     fit = ( 1E26 * kappa_nu * D_metres**-2.0 * M_w_kilograms * B_w ) + ( 1E26 * kappa_nu * D_metres**-2.0 * M_c_kilograms * B_c )
-    chi_squared = ( (fluxes-fit)**2.0 / errors**2.0 )
+    chi_squared = ( np.divide((fluxes-fit)**2.0, errors**2.0) )
 
     # Adjust chi-squared to account for limits
     if (True in limits)==True:
@@ -577,7 +583,7 @@ def ChrisFit_2GB_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments,
     fluxes_corr = np.empty([wavelengths.shape[0]])
     for w in range(0, wavelengths.shape[0]):
         corr_output = ChrisFit_ColourCorrection(wavelengths[w], instruments[w], params['T_w'].value, params['T_c'].value, params['M_w'].value, params['M_c'].value, beta=params['beta'].value)
-        fluxes_corr[w] = fluxes[w] / corr_output[0]
+        fluxes_corr[w] = np.divide(fluxes[w], corr_output[0])
 
     # Extract parameters
     T_w = params['T_w'].value
@@ -590,18 +596,18 @@ def ChrisFit_2GB_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments,
     beta = params['beta'].value
 
     # Convert wavelength to frequency, and find kappa
-    nu = c / wavelengths
-    nu_0 = c / lambda_0
-    kappa_nu = kappa_0 * ( nu / nu_0 )**beta
+    nu = np.divide(c, wavelengths)
+    nu_0 = np.divide(c, lambda_0)
+    kappa_nu = kappa_0 * ( np.divide(nu, nu_0) )**beta
 
     # Evaluate hot dust Planck function
-    B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_w_e = (h * nu) / (k * T_w)
+    B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_w_e = np.divide((h * nu), (k * T_w))
     B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate fluxes of fit, and find chi_squared
@@ -609,7 +615,7 @@ def ChrisFit_2GB_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments,
     M_c_kilograms = M_c * 2E30
     D_metres = D * 3.26 * 9.5E15
     fit = ( 1E26 * kappa_nu * D_metres**-2.0 * M_w_kilograms * B_w ) + ( 1E26 * kappa_nu * D_metres**-2.0 * M_c_kilograms * B_c )
-    chi_squared = ( (fluxes_corr-fit)**2.0 / errors**2.0 )
+    chi_squared = ( np.divide((fluxes_corr-fit)**2.0, errors**2.0) )
 
     # Adjust chi-squared to account for limits
     if (True in limits)==True:
@@ -630,21 +636,21 @@ def ChrisFit_2GB_Omega_LMfit(params, wavelengths, fluxes, errors, limits=[False]
     beta = params['beta'].value
 
     # Convert wavelength to frequency
-    nu = c / wavelengths
+    nu = np.divide(c, wavelengths)
 
     # Evaluate hot dust Planck function
-    B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_w_e = (h * nu) / (k * T_w)
+    B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_w_e = np.divide((h * nu), (k * T_w))
     B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate fluxes of fit, and find chi_squared
     fit = ( 1E26 * nu**beta * Omega_w * B_w ) + ( 1E26 * nu**beta * Omega_c * B_c )
-    chi_squared = ( (fluxes-fit)**2.0 / errors**2.0 )
+    chi_squared = ( np.divide((fluxes-fit)**2.0, errors**2.0) )
 
     # Adjust chi-squared to account for limits
     if (True in limits)==True:
@@ -665,7 +671,7 @@ def ChrisFit_2GB_Omega_ColCorr_LMfit(params, wavelengths, fluxes, errors, instru
     fluxes_corr = np.empty([wavelengths.shape[0]])
     for w in range(0, wavelengths.shape[0]):
         corr_output = ChrisFit_ColourCorrection(wavelengths[w], instruments[w], params['T_w'].value, params['T_c'].value, params['M_w'].value, params['M_c'].value, beta=params['beta'].value)
-        fluxes_corr[w] = fluxes[w] / corr_output[0]
+        fluxes_corr[w] = np.divide(fluxes[w], corr_output[0])
 
     # Extract parameters
     T_w = params['T_w'].value
@@ -675,21 +681,21 @@ def ChrisFit_2GB_Omega_ColCorr_LMfit(params, wavelengths, fluxes, errors, instru
     beta = params['beta'].value
 
     # Convert wavelength to frequency
-    nu = c / wavelengths
+    nu = np.divide(c, wavelengths)
 
     # Evaluate hot dust Planck function
-    B_w_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_w_e = (h * nu) / (k * T_w)
+    B_w_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_w_e = np.divide((h * nu), (k * T_w))
     B_w = B_w_prefactor * (np.e**B_w_e - 1)**-1.0
 
     # Evaluate cold dust Planck function
-    B_c_prefactor = (2.0 * h * nu**3.0) / c**2.0
-    B_c_e = (h * nu) / (k * T_c)
+    B_c_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+    B_c_e = np.divide((h * nu), (k * T_c))
     B_c = B_c_prefactor * (np.e**B_c_e - 1)**-1.0
 
     # Calculate fluxes of fit, and find chi_squared
     fit = ( 1E26 * nu**beta * Omega_w * B_w ) + ( 1E26 * nu**beta * Omega_c * B_c )
-    chi_squared = ( (fluxes-fit)**2.0 / errors**2.0 )
+    chi_squared = ( np.divide((fluxes-fit)**2.0, errors**2.0) )
 
     # Adjust chi-squared to account for limits
     if (True in limits)==True:
@@ -723,8 +729,8 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
     except:
         unknown = True
         if verbose==False:
-            print ' '
-            print 'Instrument \''+instrument+'\' not recognised, no colour correction applied.'
+            print(' ')
+            print('Instrument \''+instrument+'\' not recognised, no colour correction applied.')
 
     # If instrument successfuly identified, perform colour correction; otherwise, cease
     if unknown==True:
@@ -735,7 +741,6 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
         # Calculate relative flux at wavelengths at points 1 um to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
         lambda_plus = wavelength+1E-6
         lambda_minus = wavelength-1E-6
-
         flux_plus = ChrisFit_2GB_Flux(lambda_plus, T_w, T_c, M_w, M_c, 1, beta=beta)
         flux_minus = ChrisFit_2GB_Flux(lambda_minus, T_w, T_c, M_w, M_c, 1, beta=beta)
 
