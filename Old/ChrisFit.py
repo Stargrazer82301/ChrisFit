@@ -498,6 +498,8 @@ def ChrisFit_2GB_Flux(wavelength, T_w, T_c, M_w, M_c, D, kappa_0=0.051, lambda_0
 
     return flux
 
+
+
 # Function to calculate flux at a given wavelength of a two-component modified blackbody with a general normalisation constant omega
 # Input: Wavelength (m), warm dust temperature (K), cold dust temperature (K), warm omega, cold omega, beta
 # Returns: Flux (Jy) at wavelength in question
@@ -523,8 +525,6 @@ def ChrisFit_2GB_Omega_Flux(wavelength, T_w, T_c, Omega_w, Omega_c, beta=2.0):
     flux = ( 1E26 * nu**beta * Omega_w * B_w ) + ( 1E26 * nu**beta * Omega_c * B_c )
 
     return flux
-
-
 
 
 
@@ -569,6 +569,8 @@ def ChrisFit_2GB_LMfit(params, wavelengths, fluxes, errors, limits=[False]):
     if (True in limits)==True:
         chi_squared[ np.where( (np.array(limits)==True) & (fit-fluxes<0) ) ] = 0.0
     return chi_squared
+
+
 
 # Function to calculate the chi-sqiared between a set of fluxes to be colour-corrected and a two-component modified blackbody using the LMfit package
 # Input: Parameter object containing {warm dust temperature (K), cold dust temperature (K), warm dust mass (Msol), cold dust mass (Msol), distance (pc), kappa_0, lambda_0, beta}, array of wavelengths (m), array of fluxes (Jy), array of uncertainties (Jy), list of camera used at each band, array of booleans stating whether point is upper limit
@@ -623,6 +625,8 @@ def ChrisFit_2GB_ColCorr_LMfit(params, wavelengths, fluxes, errors, instruments,
 
     return chi_squared
 
+
+
 # Function to calculate the chi-sqiared between a set of fluxes and a two-component modified blackbody with a general normalisation constant omega using the LMfit package
 # Input: Parameter object containing {warm dust temperature (K), cold dust temperature (K), warm omega, cold omega, beta}, array of wavelengths (m), array of fluxes (Jy), array of uncertainties (Jy), array of booleans stating whether point is upper limit
 # Returns: Chi-squared value of fit
@@ -657,6 +661,8 @@ def ChrisFit_2GB_Omega_LMfit(params, wavelengths, fluxes, errors, limits=[False]
         chi_squared[ np.where( (np.array(limits)==True) & (fit-fluxes<0) ) ] = 0.0
 
     return chi_squared
+
+
 
 # Function to calculate the chi-sqiared between a set of fluxes to be colour-corrected and a two-component modified blackbody with a general normalisation constant omega using the LMfit package
 # Input: Parameter object containing {warm dust temperature (K), cold dust temperature (K), warm omega, cold omega, beta}, array of wavelengths (m), array of fluxes (Jy), array of uncertainties (Jy), array of booleans stating whether point is upper limit
