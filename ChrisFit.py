@@ -28,35 +28,42 @@ def Fit(gal_dict,
         Function that runs the ChrisFit dust SED fitting routine.
 
         Arguments:
-            gal_dict:           A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the values for the target source in
-                                question
-            bands_frame:        A dataframe, with columns called 'band', 'flux', and 'error', providing the relevant values for each band for the
-                                target source in question
+            gal_dict:           A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
+                                values for the target source in  question
+            bands_frame:        A dataframe, with columns called 'band', 'flux', and 'error', providing the relevant
+                                values for each band for the target source in question
 
         Keyword arguments:
-            beta_vary:          A boolean, stating whether or not beta (the emissivity slope) should a free parameter, or fixed
-            beta:               A float, stating the value of beta to use if beta_vary is set to true. If beta_vary is set to false, beta will provide
-                                starting position for MCMC
-            components:         An integer, stating how many modified blackbody components should make up the model being fit
-            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to caculate dust mass (uses Clark et al., 2016,
-                                value by default)
-            kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other wavelengths extrapolated via
-                                (lambda_0/lambda)**beta
+            beta_vary:          A boolean, stating whether or not beta (the emissivity slope) should a free parameter,
+                                or fixed
+            beta:               A float, stating the value of beta to use if beta_vary is set to true. If beta_vary is
+                                set to false, beta will provide starting position for MCMC
+            components:         An integer, stating how many modified blackbody components should make up the model
+                                being fit
+            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to caculate dust mass
+                                (uses Clark et al., 2016, value by default)
+            kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
+                                wavelengths extrapolated via (lambda_0/lambda)**beta
             plot:               A boolean, stating whether to generate plots of the resulting SED fit
-            covar_unc:          A dictionary, describing band-covariant uncertainties (if any); eg, 5% Hershcel-SPIRE band covariance:
+            covar_unc:          A dictionary, describing band-covariant uncertainties (if any); eg, 5% Hershcel-SPIRE
+                                band covariance:
                                 covar_error = [{'bands':['SPIRE_250','SPIRE_350','SPIRE_500'],'corr_err':0.05}]
-            priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called 'temp', 'mass', and 'beta', each
-                                entry being an n-length list, where n is the number of components, with the n-th list element being a function giving
-                                the prior for the parameter in question (ie, temperature, mass, or beta) of the n-th component of the model
+            priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
+                                'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
+                                components, with the n-th list element being a function giving the prior for the
+                                parameter in question (ie, temperature, mass, or beta) of the n-th model component
         """
+
+
+        # Define priors for parameters, for 1st, 2nd, and nth parameters
 
 
 
 
 def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta=2.0):
     """
-    Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given distance, assuming modified
-    blackbody ('greybody') emission
+    Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
+    distance, assuming modified blackbody ('greybody') emission
 
     Arguments:
         wavelength:     A float, or list of floats, giving the wavelength(s) (in m) of interest
@@ -65,19 +72,23 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
         dist:           A float, giving the distance to the target source (in pc)
 
     Keyword arguments:
-        kappa_0:        A float, or list of floats, giving the dust mass absorption coefficient(s) (in m**2 kg**-1), kappa, of each dust component;
-                        reference wavelengths given by kwarg lambda_0
-        lambda_0:       A float, or list of floats, giving the reference wavelength (in m) coresponding to each value of kappa_0
+        kappa_0:        A float, or list of floats, giving the dust mass absorption coefficient(s) (in m**2 kg**-1),
+                        kappa, of each dust component; reference wavelengths given by kwarg lambda_0
+        lambda_0:       A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
+                        of kappa_0
         beta:           A float, or list of floats, giving the dust emissivity slope(s), beta, of each dust component
 
-    If wavelenghth is given as a list, a list of output fluxes will be given, corresponding to the calculated flux at each wavelength.
+    If wavelenghth is given as a list, a list of output fluxes will be given, corresponding to the calculated flux at
+    each wavelength.
 
-    Temperature and mass can be set to be lists , corresponding to multiple dust components. For n components, both lists must be of length n.
+    Temperature and mass can be set to be lists , corresponding to multiple dust components. For n components, both
+    lists must be of length n.
 
-    Optionally, a different dust mass absorption coefficient (ie, kappa) can be used for each component; this is done by giving lists of length n for
-    kappa_0 and lambda_0.
+    Optionally, a different dust mass absorption coefficient (ie, kappa) can be used for each component; this is done by
+    giving lists of length n for kappa_0 and lambda_0.
 
-    Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a list of length n for beta.
+    Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a
+    list of length n for beta.
     """
 
     # Define function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries
