@@ -65,7 +65,7 @@ for g in cat_frame.index:
     dsfdsf
 
     # Call ChrisFit
-    out_dict = ChrisFit.Fir(gal_dict,
+    out_dict = ChrisFit.Fit(gal_dict,
                             bands_frame,
                             covar_errors = covar_errors,
                             beta_vary = True,

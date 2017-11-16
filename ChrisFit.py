@@ -1,15 +1,20 @@
 # Import smorgasbord
 from __future__ import print_function
+import pdb
 import sys
 import os
 import numpy as np
 
+# Define physical constants
+c = 3E8
+h = 6.64E-34
+k = 1.38E-23
 
 
 
 
 
-def fit(gal_dict,
+def Fit(gal_dict,
         bands_frame,
         beta_vary = True,
         beta = 2.0,
