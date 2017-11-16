@@ -31,7 +31,7 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','PACS_70','PACS_100','PAC
                             'limit':        [True, False, False, False, False, False, False]})
 
 # Add correlated uncertainty information to band dataframe
-correlated_errors = [{'bands':['SPIRE_250','SPIRE_350','SPIRE_500'],'corr_err':0.05}]
+covar_errors = [{'bands':['SPIRE_250','SPIRE_350','SPIRE_500'],'corr_err':0.05}]
 
 # Initiate settings dictionary
 settings_dict = {'plotting':True}
@@ -43,8 +43,7 @@ for g in cat_frame.index:
         continue
 
     # Create input dictionary for this galaxy
-    gal_dict = {'data':copy.deepcopy(bands_frame),
-                'name':cat_frame.loc[g],
+    gal_dict = {'name':cat_frame.loc[g],
                 'distance':cat_frame_gal['dist'],
                 'redshift':3E5/cat_frame_gal['vel_helio']}
 
@@ -63,14 +62,16 @@ for g in cat_frame.index:
         if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
             gal_dict['data']['flux'] = np.NaN
             gal_dict['data']['error'] = np.NaN
+    dsfdsf
 
     # Call ChrisFit
-    out_dict = ChrisFit.ChrisFit(gal_dict,
-                                 beta_vary = True,
-                                 beta = 2.0,
-                                 components = 2,
-                                 kappa_0 = 0.051,
-                                 lambda_0 = 500E-6,
-                                 plot_make = True,
-                                 plot_dir = None)
+    out_dict = ChrisFit.Fir(gal_dict,
+                            bands_frame,
+                            covar_errors = covar_errors,
+                            beta_vary = True,
+                            beta = 2.0,
+                            components = 2,
+                            kappa_0 = 0.051,
+                            kappa_0_lambda = 500E-6,
+                            plot = True)
 
