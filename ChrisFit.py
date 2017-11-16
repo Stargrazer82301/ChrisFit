@@ -125,10 +125,12 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     flux = np.zeros(n_band)
     for m in range(n_comp):
         flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
-    #flux = ( 1E26 * kappa_nu * dist_metres**-2.0 * mass_kilograms * B_planck )
 
+    # Return calculated flux (de-numpifying it if onlya single value)
+    if flux.size == 0:
+        flux = flux[0]
+    #flux([250E-6,350E-6,500E-6], [15.0,25.0], [1E8,1E5], 25E6, kappa_0=[0.051,0.077], lambda_0=[500E-6,850E-6], beta=[1.5,2.0])
     return flux
 
 
 
-flux([250E-6,350E-6,500E-6], [15.0,25.0], [1E8,1E5], 25E6, kappa_0=[0.051,0.077], lambda_0=[500E-6,850E-6], beta=[1.5,2.0])
