@@ -160,11 +160,61 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     for m in range(n_comp):
         flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
 
-    # Return calculated flux (de-numpifying it if onlya single value)
+    # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
-    #flux([250E-6,350E-6,500E-6], [15.0,25.0], [1E8,1E5], 25E6, kappa_0=[0.051,0.077], lambda_0=[500E-6,850E-6], beta=[1.5,2.0])
+    #flux([250E-6,350E-6,500E-6], [21.7,64.1], [3.92*(10**7.93),3.92*(10**4.72)], 25E6, kappa_0=[0.051,0.051], lambda_0=[500E-6,500E-6], beta=[2.0,2.0])
     return flux
 
+
+
+
+
+def Numpify(var, n_target=False):
+    """ Function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries """
+
+    # If variable is not iterable (ie, a list/array/etc), convert into an appropriate-length list
+    if not hasattr(var, '__iter__'):
+        if not n_target:
+            var = list(var)
+        else:
+            var = [var]*n_target
+
+    # If necessary Convert a single-element iterable into a list of length n_targets
+    elif len(var) == 1 and n_target > 1:
+        var = [var[0]]*n_target
+
+    # Object to mis-matched list lengths
+    elif len(var) > 1 and len(var) != n_target:
+            Exception('Variable list must either be of length 1, or of length n_targets')
+
+    # If variable is not a numpy array, turn it into one
+    if not isinstance(var, np.ndarray):
+        var = np.array(var)
+
+    # Return freshly-numpified variable
+    return var
+
+
+
+def ParamsExtract(params, fit_dict):
+    """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
+    (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n, beta_1, beta_2, ..., beta_n);
+    note that beta values are only included if fit_dict['beta_vary'] == True. """
+
+    # Initiate and populate dust temperature and dust mass parameter sub-vectors
+    temp_vector = []
+    mass_vector = []
+    [ temp_vector.append(params[i]) for i in range(fit_dict['components']) ]
+    [ mass_vector.append(params[i]) for i in range(fit_dict['components'], 2*fit_dict['components']) ]
+
+    # Initiate and populate beta parameter sub-vector (from params if beta variable, else from fit_dict otherwise)
+    if fit_dict['beta_vary']:
+        beta_vector = []
+        [ beta_vector.append(params[i]) for i in range(2*fit_dict['components'], 3*fit_dict['components']) ]
+    else:
+        beta_vector = copy.deepcopy(fit_dict['beta'])
+
+    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector))
 
 
