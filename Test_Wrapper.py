@@ -31,7 +31,9 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','PACS_70','PACS_100','PAC
                             'limit':        [True, False, False, False, False, False, False]})
 
 # Add correlated uncertainty information to band dataframe
-covar_errors = [{'bands':['SPIRE_250','SPIRE_350','SPIRE_500'],'corr_err':0.05}]
+covar_unc = [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
+              'covar_scale':0.04,
+              'covar_distr':'flat'}]
 
 # Initiate settings dictionary
 settings_dict = {'plotting':True}
@@ -41,6 +43,7 @@ for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
     if cat_frame_gal['name'] != 'NGC4030':
         continue
+    bands_frame_gal = copy.deepcopy(bands_frame)
 
     # Create input dictionary for this galaxy
     gal_dict = {'name':cat_frame.loc[g],
@@ -48,26 +51,25 @@ for g in cat_frame.index:
                 'redshift':3E5/cat_frame_gal['vel_helio']}
 
     # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
-    gal_dict['data']['flux'] = pd.Series(np.array([len(gal_dict['data'])*np.NaN]), index=gal_dict['data'].index)
-    gal_dict['data']['error'] = pd.Series(np.array([len(gal_dict['data'])*np.NaN]), index=gal_dict['data'].index)
+    bands_frame_gal['flux'] = pd.Series(np.array([len(bands_frame_gal)*np.NaN]), index=bands_frame_gal.index)
+    bands_frame_gal['error'] = pd.Series(np.array([len(bands_frame_gal)*np.NaN]), index=bands_frame_gal.index)
 
     # Loop over bands, retrieving corresponding fluxes for this galaxy (where available)
-    for b in range(len(gal_dict['data']['band'])):
-        band = gal_dict['data']['band'][b]
+    for b in range(len(bands_frame_gal['band'])):
+        band = bands_frame_gal['band'][b]
         if band in cat_frame.columns:
-            gal_dict['data']['flux'][b] = cat_frame.loc[g][band]
-            gal_dict['data']['error'][b] = cat_frame.loc[g][band+'_err']
+            bands_frame_gal.loc[b,'flux'] = cat_frame.loc[:,band][g]
+            bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
 
         # Prune fluxes with major flags
         if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
-            gal_dict['data']['flux'] = np.NaN
-            gal_dict['data']['error'] = np.NaN
-    dsfdsf
+            bands_frame_gal.loc[b,'flux'] = np.NaN
+            bands_frame_gal.loc[b,'error'] = np.NaN
 
     # Call ChrisFit
     out_dict = ChrisFit.Fit(gal_dict,
                             bands_frame,
-                            covar_errors = covar_errors,
+                            covar_unc = covar_unc,
                             beta_vary = True,
                             beta = 2.0,
                             components = 2,
