@@ -1,9 +1,9 @@
 # Import smorgasbord
 from __future__ import print_function
 import pdb
-import sys
-import os
+import copy
 import numpy as np
+import emcee
 
 # Define physical constants
 c = 3E8
@@ -23,7 +23,8 @@ def Fit(gal_dict,
         kappa_0_lambda = 500E-6,
         plot = True,
         covar_unc = None,
-        priors = None):
+        priors = None,
+        full_posterior = False):
         """
         Function that runs the ChrisFit dust SED fitting routine.
 
@@ -36,8 +37,9 @@ def Fit(gal_dict,
         Keyword arguments:
             beta_vary:          A boolean, stating whether or not beta (the emissivity slope) should a free parameter,
                                 or fixed
-            beta:               A float, stating the value of beta to use if beta_vary is set to true. If beta_vary is
-                                set to false, beta will provide starting position for MCMC
+            beta:               A float, or list of floats, stating the value(s) of beta to use. If only a single float
+                                is given, this is used for all components. If beta_vary is set to true, beta will
+                                provide starting position for MCMC
             components:         An integer, stating how many modified blackbody components should make up the model
                                 being fit
             kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to caculate dust mass
@@ -45,14 +47,22 @@ def Fit(gal_dict,
             kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
                                 wavelengths extrapolated via (lambda_0/lambda)**beta
             plot:               A boolean, stating whether to generate plots of the resulting SED fit
-            covar_unc:          A dictionary, describing band-covariant uncertainties (if any); eg, 5% Hershcel-SPIRE
-                                band covariance:
-                                covar_error = [{'bands':['SPIRE_250','SPIRE_350','SPIRE_500'],'corr_err':0.05}]
+            covar_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
+                                uncertainties; for the 5% Hershcel-SPIRE band covariance, covar_unc would be:
+                                [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
+                                'covar_scale':0.04,
+                                'covar_distr':'flat'}],
+                                where 'bands' describes the bands (as named in bands_frame) in question, 'covar_scale'
+                                describes the size of the covariant component of the flux uncertainty (as a fraction of
+                                measured source flux), and 'covar_dist' is the distribution of the uncertainty
+                                (currently accepting either 'flat' or 'normal')
             priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
                                 'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
                                 components, with the n-th list element being a function giving the prior for the
                                 parameter in question (ie, temperature, mass, or beta) of the n-th model component
-        """
+            full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
+                                returned, or just the summary of median, credible interval, etc
+            """
 
 
         # Define priors for parameters, for 1st, 2nd, and nth parameters
