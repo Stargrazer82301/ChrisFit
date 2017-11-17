@@ -65,7 +65,78 @@ def Fit(gal_dict,
             """
 
 
-        # Define priors for parameters, for 1st, 2nd, and nth parameters
+        def LnLike(params, bands_frame, fit_dict):
+            """ Funtion to compute log-likelihood of some data, given the parameters of the proposed model """
+
+            # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
+            temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
+
+            # Loop over fluxes, to calculate the log-likelihood of each, given the proposed model
+            for b in range(bands_frame['wavelength'].size):
+                pdb.set_trace()
+
+
+            ### REMEMBER TO HANDLE LIMITS - JUST MAKE IT SO THAT LOG-LIKELIHOODS BENEATH MOST-LIKELY VALUE ARE ALL SAME AS THE MOST LIKELY VALUE ###
+
+            # Return data log-likelihood
+            return
+
+
+
+        def LnPrior(params, fit_dict):
+            """ Function to compute prior log-likelihood of the parameters of the proposed model """
+
+            # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
+            temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
+
+            # Return prior log-likelihood
+            return
+
+
+
+        def LnPost(params, bands_frame, fit_dict):
+            """ Funtion to compute posterior log-likelihood of the parameters of the proposed model, given some data """
+
+            # Caculate prior log-likelihood of the proposed model parameters
+            ln_prior = LnPrior(params, fit_dict)
+
+            # Caculate the log-likelihood of the data, given the proposed model parameters
+            ln_like = LnLike(params, bands_frame, fit_dict)
+
+            # Calculate and return the posterior log-likelihood of the proposed model parameters, given the data
+            ln_prob = ln_prior + ln_like
+            return ln_prob
+
+
+
+        # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
+        if not hasattr(beta, '__iter__'):
+            beta = np.array([beta])
+        if len(beta) == 1 and components > 1:
+            beta = np.array([beta[0]] * int(components))
+        elif len(beta) != int(components):
+            Exception('Either provide a single value of beta, or a list of values of length the number of components')
+
+        # Bundle various fitting argumnts in to a dictionary
+        fit_dict = {'components':components,
+                    'beta_vary':beta_vary,
+                    'beta':beta,
+                    'covar_unc':covar_unc}
+
+        # Determine number of parameters
+        n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
+
+        # Arbitrary test model
+        test = LnLike((21.7, 64.1, 3.92*(10**7.93), 3.92*(10**4.72), 2.0, 2.0), bands_frame, fit_dict)
+
+        # Initiate emcee affine-invariant ensemble sampler
+        sampler = emcee.EnsembleSampler(n_walkers, n_params, LnProb, args=(bands_frame, fit_dict))
+
+
+
+
+
+
 
 
 
@@ -73,7 +144,7 @@ def Fit(gal_dict,
 def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta=2.0):
     """
     Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
-    distance, assuming modified blackbody ('greybody') emission
+    distance, assuming modified blackbody ('greybody') emission.
 
     Arguments:
         wavelength:     A float, or list of floats, giving the wavelength(s) (in m) of interest
@@ -101,19 +172,6 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     list of length n for beta.
     """
 
-    # Define function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries
-    def Numpify(var, n_target=False):
-        if not hasattr(var, '__iter__'):
-            if not n_target:
-                var = list(var)
-            else:
-                var = [var]*n_target
-        else:
-            if len(var)==1 and n_target>1:
-                var = [var[0]]*n_target
-        if not isinstance(var, np.ndarray):
-            var = np.array(var)
-        return var
 
     # Record number of model components, and number of bands of interest
     n_comp = len(temp)
