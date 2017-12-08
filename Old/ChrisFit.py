@@ -720,7 +720,7 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
 
     # Set location of ChrisFuncs.py to be current working directory
     old_cwd = os.getcwd()
-    os.chdir(str(os.path.dirname(os.path.realpath(__file__))))
+    os.chdir(str(os.path.dirname(os.path.realpath(sys.argv[0]))))
 
     # Identify instrument and wavelength, and read in corresponding colour-correction data
     unknown = False
@@ -760,6 +760,7 @@ def ChrisFit_ColourCorrection(wavelength, instrument, T_w, T_c, M_w, M_c, beta=2
             divisor = extrap([index])[0]
         elif index<np.min(data_index):
             extrap = ChrisFuncs.Extrap1D(interp)
+            pdb.set_trace()
             divisor = extrap([index])[0]
         else:
             divisor = interp.__call__(index)
