@@ -173,8 +173,11 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     """
 
 
-    # Record number of model components, and number of bands of interest
-    n_comp = len(temp)
+    # Record number of model components
+    if hasattr(temp, '__iter__'):
+        n_comp = len(temp)
+    else:
+        n_comp = 1
 
     # As needed, convert variables to arrays
     wavelength = Numpify(wavelength)
@@ -233,7 +236,7 @@ def Numpify(var, n_target=False):
     # If variable is not iterable (ie, a list/array/etc), convert into an appropriate-length list
     if not hasattr(var, '__iter__'):
         if not n_target:
-            var = list(var)
+            var = [var]
         else:
             var = [var]*n_target
 
