@@ -141,7 +141,7 @@ def Fit(gal_dict,
 
 
 
-def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta=2.0):
+def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0):
     """
     Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
     distance, assuming modified blackbody ('greybody') emission.
@@ -154,8 +154,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
 
     Keyword arguments:
         kappa_0:        A float, or list of floats, giving the dust mass absorption coefficient(s) (in m**2 kg**-1),
-                        kappa, of each dust component; reference wavelengths given by kwarg lambda_0
-        lambda_0:       A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
+                        kappa, of each dust component; reference wavelengths given by kwarg kappa_0_lambda
+        kappa_0_lambda:       A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
                         of kappa_0
         beta:           A float, or list of floats, giving the dust emissivity slope(s), beta, of each dust component
 
@@ -166,7 +166,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     lists must be of length n.
 
     Optionally, a different dust mass absorption coefficient (ie, kappa) can be used for each component; this is done by
-    giving lists of length n for kappa_0 and lambda_0.
+    giving lists of length n for kappa_0 and kappa_0_lambda.
 
     Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a
     list of length n for beta.
@@ -182,18 +182,18 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     temp = Numpify(temp)
     mass = Numpify(mass, n_target=n_comp)
     kappa_0 = Numpify(kappa_0, n_target=n_comp)
-    lambda_0 = Numpify(lambda_0, n_target=n_comp)
+    kappa_0_lambda = Numpify(kappa_0_lambda, n_target=n_comp)
     beta = Numpify(beta, n_target=n_comp)
 
     # Check that variables are the same length, when they need to be
-    if np.std([len(temp), len(mass), len(beta), len(kappa_0), len(lambda_0)]) != 0:
-        Exception('Number of dust components needs to be identical for temp/mass/beta/kappa_0/lambda_0 variables')
+    if np.std([len(temp), len(mass), len(beta), len(kappa_0), len(kappa_0_lambda)]) != 0:
+        Exception('Number of dust components needs to be identical for temp/mass/beta/kappa_0/kappa_0_lambda variables')
 
     """ NB: Arrays have dimensons of n_comp rows by n_bands columns """
 
     # Convert wavelengths to frequencies (for bands of interest, and for kappa_0 reference wavelengths)
     nu = np.divide(c, wavelength)
-    nu_0 = np.divide(c, lambda_0)
+    nu_0 = np.divide(c, kappa_0_lambda)
 
     # Calculate kappa for the frequency of each band of interest
     kappa_nu_base = np.outer(nu_0**-1, nu) # This being the array-wise equivalent of nu/nu_0
@@ -221,7 +221,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, lambda_0=500E-6, beta
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
-    #flux([250E-6,350E-6,500E-6], [21.7,64.1], [3.92*(10**7.93),3.92*(10**4.72)], 25E6, kappa_0=[0.051,0.051], lambda_0=[500E-6,500E-6], beta=[2.0,2.0])
+    #flux([250E-6,350E-6,500E-6], [21.7,64.1], [3.92*(10**7.93),3.92*(10**4.72)], 25E6, kappa_0=[0.051,0.051], kappa_0_lambda=[500E-6,500E-6], beta=[2.0,2.0])
     return flux
 
 
