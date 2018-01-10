@@ -175,7 +175,6 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
     # Record number of model components, and number of bands of interest
     n_comp = len(temp)
-    n_band = len(wavelength)
 
     # As needed, convert variables to arrays
     wavelength = Numpify(wavelength)
@@ -214,7 +213,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     dist_metres = dist * 3.26 * 9.5E15
 
     # Calculate flux for each component, for each dust model component
-    flux = np.zeros(n_band)
+    flux = 0.0
     for m in range(n_comp):
         flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
 
