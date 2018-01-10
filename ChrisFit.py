@@ -45,7 +45,7 @@ def Fit(gal_dict,
             kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to caculate dust mass
                                 (uses Clark et al., 2016, value by default)
             kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
-                                wavelengths extrapolated via (lambda_0/lambda)**beta
+                                wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
             plot:               A boolean, stating whether to generate plots of the resulting SED fit
             covar_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
                                 uncertainties; for the 5% Hershcel-SPIRE band covariance, covar_unc would be:
@@ -65,47 +65,55 @@ def Fit(gal_dict,
             """
 
 
-        def LnLike(params, bands_frame, fit_dict):
-            """ Funtion to compute log-likelihood of some data, given the parameters of the proposed model """
+        def LnLike(params, bands_frame, gal_dict, fit_dict):
+            """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
 
-            # Loop over fluxes, to calculate the log-likelihood of each, given the proposed model
-            for b in range(bands_frame['wavelength'].size):
-                pdb.set_trace()
+            # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
+            ln_like = -1.0
+            for b in bands_frame.index.values:
+
+                # Calculate predicted flux, given SED parameters
+                band_flux_pred = ModelFlux(bands_frame.loc[0,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
+                
+                #
+                
+                # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
+                
 
 
-            ### REMEMBER TO HANDLE LIMITS - JUST MAKE IT SO THAT LOG-LIKELIHOODS BENEATH MOST-LIKELY VALUE ARE ALL SAME AS THE MOST LIKELY VALUE ###
+            ### REMEMBER TO HANDLE LIMITS - JUST MAKE IT SO THAT LN-LIKELIHOODS BENEATH MOST-LIKELY VALUE ARE ALL SAME AS THE MOST LIKELY VALUE ###
 
-            # Return data log-likelihood
+            # Return data ln-likelihood
             return
 
 
 
         def LnPrior(params, fit_dict):
-            """ Function to compute prior log-likelihood of the parameters of the proposed model """
+            """ Function to compute prior ln-likelihood of the parameters of the proposed model """
 
-            # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
+            # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
 
-            # Return prior log-likelihood
+            # Return prior ln-likelihood
             return
 
 
 
         def LnPost(params, bands_frame, fit_dict):
-            """ Funtion to compute posterior log-likelihood of the parameters of the proposed model, given some data """
+            """ Funtion to compute posterior ln-likelihood of the parameters of the proposed model, given some data """
 
-            # Caculate prior log-likelihood of the proposed model parameters
+            # Caculate prior ln-likelihood of the proposed model parameters
             ln_prior = LnPrior(params, fit_dict)
 
-            # Caculate the log-likelihood of the data, given the proposed model parameters
+            # Caculate the ln-likelihood of the data, given the proposed model parameters
             ln_like = LnLike(params, bands_frame, fit_dict)
 
-            # Calculate and return the posterior log-likelihood of the proposed model parameters, given the data
-            ln_prob = ln_prior + ln_like
-            return ln_prob
+            # Calculate and return the posterior ln-likelihood of the proposed model parameters, given the data
+            ln_post = ln_prior + ln_like
+            return ln_post
 
 
 
@@ -126,11 +134,12 @@ def Fit(gal_dict,
         # Determine number of parameters
         n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
 
-        # Arbitrary test model
-        test = LnLike((21.7, 64.1, 3.92*(10**7.93), 3.92*(10**4.72), 2.0, 2.0), bands_frame, fit_dict)
+        # Arbitrary test model        
+        test = LnLike((21.73, 64.16, 3.92*(10**7.93), 3.92*(10**4.72), 2.0, 2.0), bands_frame, gal_dict, fit_dict)
+        pdb.set_trace()
 
-        # Initiate emcee affine-invariant ensemble sampler
-        sampler = emcee.EnsembleSampler(n_walkers, n_params, LnProb, args=(bands_frame, fit_dict))
+        # Initiate emcee affine-invariant ensemble sampler       
+        sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
 
 
 
@@ -155,7 +164,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     Keyword arguments:
         kappa_0:        A float, or list of floats, giving the dust mass absorption coefficient(s) (in m**2 kg**-1),
                         kappa, of each dust component; reference wavelengths given by kwarg kappa_0_lambda
-        kappa_0_lambda:       A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
+        kappa_0_lambda: A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
                         of kappa_0
         beta:           A float, or list of floats, giving the dust emissivity slope(s), beta, of each dust component
 
@@ -173,11 +182,18 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     """
 
 
-    # Record number of model components
-    if hasattr(temp, '__iter__'):
-        n_comp = len(temp)
-    else:
+    # Establish the number of model components
+    if hasattr(temp, '__iter__') and hasattr(mass, '__iter__'):
+        if len(temp) != len(mass):
+            Exception('Number of dust components needs to be identical for temp and mass variables')
+        else:
+            n_comp = len(temp)
+    elif not hasattr(temp, '__iter__') and not hasattr(mass, '__iter__'):
         n_comp = 1
+    else:
+        Exception('Number of dust components needs to be identical for temp and mass variables')
+        
+        
 
     # As needed, convert variables to arrays
     wavelength = Numpify(wavelength)
@@ -246,7 +262,7 @@ def Numpify(var, n_target=False):
 
     # Object to mis-matched list lengths
     elif len(var) > 1 and len(var) != n_target:
-            Exception('Variable list must either be of length 1, or of length n_targets')
+        Exception('Variable list must either be of length 1, or of length n_targets')
 
     # If variable is not a numpy array, turn it into one
     if not isinstance(var, np.ndarray):

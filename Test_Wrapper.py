@@ -47,7 +47,7 @@ for g in cat_frame.index:
 
     # Create input dictionary for this galaxy
     gal_dict = {'name':cat_frame.loc[g],
-                'distance':cat_frame_gal['dist'],
+                'distance':3E6*cat_frame_gal['dist'],
                 'redshift':3E5/cat_frame_gal['vel_helio']}
 
     # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
