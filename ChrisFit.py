@@ -74,26 +74,32 @@ def Fit(gal_dict,
             """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, covar_vector = ParamsExtract(params, fit_dict)
 
             # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
             ln_like = -1.0
             for b in bands_frame.index.values:
 
-                # Calculate predicted flux, given SED parameters
+                # Calculate predicted flux, given SED parameters                
                 band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
                 
                 # Factor in colour corrections              
-                band_flux_pred = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
-                
+                col_correct_factor = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
+                band_flux_pred *= col_correct_factor[0]      
                 
                 # Factor in correlated uncertainties
+                pdb.set_trace()
+                
+                # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
+                ln_like *= ln_like
+                
+                
                 
                 
                 # Factor in limits
                 
                 
-                # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
+                
                 
 
 
@@ -108,7 +114,7 @@ def Fit(gal_dict,
             """ Function to compute prior ln-likelihood of the parameters of the proposed model """
 
             # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, covar_vector = ParamsExtract(params, fit_dict)
 
             # Return prior ln-likelihood
             return
@@ -148,7 +154,11 @@ def Fit(gal_dict,
         n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
 
         # Arbitrary test model        
-        test = LnLike((21.73, 64.16, 3.92*(10**7.93), 3.92*(10**4.72), 2.0, 2.0), bands_frame, gal_dict, fit_dict)
+        params = {'temp_1':21.73,'temp_2':21.73,
+                  'mass_1':3.92*(10**7.93),'mass_2':3.92*(10**4.72),
+                  'beta_1':2.0,'beta_2':2.0,
+                  'covar_err_1':1.0}
+        test = LnLike(params, bands_frame, gal_dict, fit_dict)
         pdb.set_trace()
 
         # Initiate emcee affine-invariant ensemble sampler       
@@ -163,7 +173,7 @@ def Fit(gal_dict,
 
 
 
-def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0):
+def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0, covar=None):
     """
     Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
     distance, assuming modified blackbody ('greybody') emission.
@@ -287,24 +297,38 @@ def Numpify(var, n_target=False):
 
 
 def ParamsExtract(params, fit_dict):
-    """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
-    (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n, beta_1, beta_2, ..., beta_n);
-    note that beta values are only included if fit_dict['beta_vary'] == True. """
-
-    # Initiate and populate dust temperature and dust mass parameter sub-vectors
+    """ Function to extract SED parameters from params dictionary. Resulting parameter tuple is structured:
+    (temp_1, temp_2, ..., temp_n, 
+    mass_1, mass_2, ..., mass_n, 
+    beta_1, beta_2, ..., beta_n, 
+    covar_err_1, covar_err_2, ..., covar_err_n)
+    Note that beta values are only required input if fit_dict['beta_vary'] == True. """
+    
+    # Initiate parameter sub-vectors
     temp_vector = []
     mass_vector = []
-    [ temp_vector.append(params[i]) for i in range(fit_dict['components']) ]
-    [ mass_vector.append(params[i]) for i in range(fit_dict['components'], 2*fit_dict['components']) ]
+    beta_vector = []
+    covar_err_vector = []
+    
+    # Loop over keys of params dictionary, placing temperature, mass, and beta parameters into appropriate sub-vectors
+    for param_key in sorted(params.keys()):
+        if 'temp_' in param_key:
+            temp_vector.append(params[param_key])
+        elif 'mass_' in param_key:
+            mass_vector.append(params[param_key])
+        elif 'beta_' in param_key:
+            beta_vector.append(params[param_key])
+        elif 'covar_' in param_key:
+            covar_err_vector.append(params[param_key])
+        else:
+            Exception('Key of entry in parameter dictionary does not match any expected parameter')
 
-    # Initiate and populate beta parameter sub-vector (from params if beta variable, else from fit_dict otherwise)
-    if fit_dict['beta_vary']:
-        beta_vector = []
-        [ beta_vector.append(params[i]) for i in range(2*fit_dict['components'], 3*fit_dict['components']) ]
-    else:
-        beta_vector = copy.deepcopy(fit_dict['beta'])
+    # If beta isn't variable, just set beta using value from fit_dict
+    if not fit_dict['beta_vary']:
+        beta_vector = copy.deepcopy(fit_dict['beta']) 
 
-    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector))
+    # Return parameters tuple
+    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
     
     
     
