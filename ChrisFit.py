@@ -1,8 +1,11 @@
 # Import smorgasbord
 from __future__ import print_function
 import pdb
+import sys
+import os
 import copy
 import numpy as np
+import scipy.interpolate
 import emcee
 
 # Define physical constants
@@ -24,7 +27,8 @@ def Fit(gal_dict,
         plot = True,
         covar_unc = None,
         priors = None,
-        full_posterior = False):
+        full_posterior = False,
+        verbose = True):
         """
         Function that runs the ChrisFit dust SED fitting routine.
 
@@ -62,6 +66,7 @@ def Fit(gal_dict,
                                 parameter in question (ie, temperature, mass, or beta) of the n-th model component
             full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
                                 returned, or just the summary of median, credible interval, etc
+            verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
             """
 
 
@@ -76,9 +81,17 @@ def Fit(gal_dict,
             for b in bands_frame.index.values:
 
                 # Calculate predicted flux, given SED parameters
-                band_flux_pred = ModelFlux(bands_frame.loc[0,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
+                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
                 
-                #
+                # Factor in colour corrections              
+                band_flux_pred = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
+                
+                
+                # Factor in correlated uncertainties
+                
+                
+                # Factor in limits
+                
                 
                 # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
                 
@@ -292,5 +305,55 @@ def ParamsExtract(params, fit_dict):
         beta_vector = copy.deepcopy(fit_dict['beta'])
 
     return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector))
+    
+    
+    
+def ColourCorrect(band_flux_pred, band_frame, temp, mass, kappa_0, kappa_0_lambda, beta, verbose):
+    """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
+    instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
+
+    # Set location of ChrisFuncs.py to be current working directory, recording the old CWD toswitch back to later
+    old_cwd = os.getcwd()
+    os.chdir(str(os.path.dirname(os.path.realpath(sys.argv[0]))))
+
+    # Identify instrument and wavelength, and read in corresponding colour-correction data
+    unknown = False
+    instrument = band_frame['band'].split('_')[0]
+    try:
+        try:
+            data_table = np.genfromtxt('Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
+        except:
+            data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument+'.csv'), delimiter=',', names=True)
+        data_index = data_table['alpha']
+        data_column = 'K'+str(int((band_frame['wavelength']*1E6)))
+        data_factor = data_table[data_column]
+    except:
+        unknown = True
+        if verbose==False:
+            print(' ')
+            print('Instrument \''+instrument+'\' not recognised, no colour correction applied.')
+
+    # If instrument successfuly identified, perform colour correction; otherwise, cease
+    if unknown==True:
+        factor = 1.0
+        index = np.NaN
+    elif unknown==False:
+
+        # Calculate relative flux at wavelengths at points at wavelengths 1% to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
+        lambda_plus = band_frame['wavelength']*1.01
+        lambda_minus = band_frame['wavelength']*0.99
+        flux_plus = ModelFlux(lambda_plus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
+        flux_minus = ModelFlux(lambda_minus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
+
+        # Determine spectral index
+        index = -1.0 * ( np.log10(flux_plus) - np.log10(flux_minus) ) / ( np.log10(lambda_plus) - np.log10(lambda_minus) )
+
+        # Use cubic spline interpolation to estimate colour-correction divisor at calculated spectral index
+        interp = scipy.interpolate.interp1d(data_index, data_factor, kind='linear', bounds_error=None, fill_value='extrapolate')
+        factor = interp(index)
+
+    # Restore old cwd, and return results
+    os.chdir(old_cwd)
+    return factor, index
 
 
