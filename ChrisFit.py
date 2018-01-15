@@ -71,7 +71,7 @@ def Fit(gal_dict,
             """
 
 
-        def LnLike(params, bands_frame, gal_dict, fit_dict):
+        def LnLike(params, bands_frame, fit_dict):
             """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
@@ -86,7 +86,7 @@ def Fit(gal_dict,
                     continue
 
                 # Calculate predicted flux, given SED parameters                
-                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
+                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
                 
                 # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)    
                 col_correct_factor = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
@@ -156,7 +156,8 @@ def Fit(gal_dict,
         fit_dict = {'components':components,
                     'beta_vary':beta_vary,
                     'beta':beta,
-                    'covar_unc':covar_unc}
+                    'covar_unc':covar_unc,
+                    'distance':gal_dict['distance']}
 
         # Determine number of parameters
         n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
@@ -169,7 +170,8 @@ def Fit(gal_dict,
         test = LnLike(params, bands_frame, gal_dict, fit_dict)
         pdb.set_trace()
 
-        # Initiate emcee affine-invariant ensemble sampler       
+        # Initiate emcee affine-invariant ensemble sampler
+        n_walkers = 500 
         sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
 
 
