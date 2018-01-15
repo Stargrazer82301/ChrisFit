@@ -7,6 +7,7 @@ import copy
 import numpy as np
 import scipy.stats
 import scipy.interpolate
+import scipy.optimize
 import emcee
 
 # Define physical constants
@@ -71,11 +72,14 @@ def Fit(gal_dict,
             """
 
 
-        def LnLike(params, bands_frame, fit_dict):
+        def LnLike(params, fit_dict):
             """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+            
+            # Extract bands_frame from fit_dict
+            bands_frame = fit_dict['bands_frame']
 
             # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
             ln_like = []
@@ -153,7 +157,8 @@ def Fit(gal_dict,
             Exception('Either provide a single value of beta, or a list of values of length the number of components')
 
         # Bundle various fitting argumnts in to a dictionary
-        fit_dict = {'components':components,
+        fit_dict = {'bands_frame':bands_frame,
+                    'components':components,
                     'beta_vary':beta_vary,
                     'beta':beta,
                     'covar_unc':covar_unc,
@@ -161,18 +166,21 @@ def Fit(gal_dict,
 
         # Determine number of parameters
         n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
-
+        """
         # Arbitrary test model        
         params = {'temp_1':21.73,'temp_2':64.1,
                   'mass_1':(10**7.93),'mass_2':(10**4.72),
                   'beta_1':2.0,'beta_2':2.0,
                   'covar_err_1':0.01}
-        test = LnLike(params, bands_frame, gal_dict, fit_dict)
-        pdb.set_trace()
-
+        test = LnLike(params, bands_frame, fit_dict)
+        """
+        # Find maximum-likelihood solution
+        NegLnLike = lambda *args: -LnLike(*args)
+        MaxLike
+        
         # Initiate emcee affine-invariant ensemble sampler
-        n_walkers = 500 
-        sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
+        mcmc_n_walkers = 50 
+        mcmc_sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
 
 
 
