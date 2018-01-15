@@ -47,7 +47,7 @@ for g in cat_frame.index:
 
     # Create input dictionary for this galaxy
     gal_dict = {'name':cat_frame.loc[g],
-                'distance':3E6*cat_frame_gal['dist'],
+                'distance':1E6*cat_frame_gal['dist'],
                 'redshift':3E5/cat_frame_gal['vel_helio']}
 
     # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
@@ -68,12 +68,12 @@ for g in cat_frame.index:
 
     # Call ChrisFit
     out_dict = ChrisFit.Fit(gal_dict,
-                            bands_frame,
+                            bands_frame_gal,
                             covar_unc = covar_unc,
                             beta_vary = True,
                             beta = 2.0,
                             components = 2,
-                            kappa_0 = 0.051,
-                            kappa_0_lambda = 500E-6,
+                            kappa_0 = 0.077,#0.051,
+                            kappa_0_lambda = 850E-6,#500E-6,
                             plot = True)
 

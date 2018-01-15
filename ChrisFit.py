@@ -5,6 +5,7 @@ import sys
 import os
 import copy
 import numpy as np
+import scipy.stats
 import scipy.interpolate
 import emcee
 
@@ -74,39 +75,46 @@ def Fit(gal_dict,
             """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, covar_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
 
             # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
-            ln_like = -1.0
+            ln_like = []
             for b in bands_frame.index.values:
+                
+                # Skip this band if flux or uncertainty are nan
+                if True in np.isnan([bands_frame.loc[b,'error'],bands_frame.loc[b,'flux']]):
+                    continue
 
                 # Calculate predicted flux, given SED parameters                
                 band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, gal_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
                 
-                # Factor in colour corrections              
+                # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)    
                 col_correct_factor = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
                 band_flux_pred *= col_correct_factor[0]      
                 
-                # Factor in correlated uncertainties
-                pdb.set_trace()
+                # If there is correlated uncertainty to take account of, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
+                band_unc = bands_frame.loc[b,'error']
+                if len(covar_err_vector) > 0:
+                    for c in range(len(fit_dict['covar_unc'])):
+                        covar_param = fit_dict['covar_unc'][c]
+                        if bands_frame.loc[b,'band'] in covar_param['covar_bands']:
+                            band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - covar_param['covar_scale']**2.0)
+                            band_flux_pred *= 1 + covar_err_vector[c]                                     
                 
                 # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
-                ln_like *= ln_like
+                band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
                 
-                
-                
-                
-                # Factor in limits
-                
-                
-                
-                
+                # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
+                if bands_frame.loc[b,'limit']:
+                    if band_flux_pred < bands_frame.loc[b,'flux']:
+                        band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
+                        
+                # Record ln-likelihood for this band
+                ln_like.append(band_ln_like)
 
-
-            ### REMEMBER TO HANDLE LIMITS - JUST MAKE IT SO THAT LN-LIKELIHOODS BENEATH MOST-LIKELY VALUE ARE ALL SAME AS THE MOST LIKELY VALUE ###
-
-            # Return data ln-likelihood
-            return
+            # Calculate and return final data ln-likelihood
+            ln_like = np.sum(np.array(ln_like))            
+            return ln_like
 
 
 
@@ -154,10 +162,10 @@ def Fit(gal_dict,
         n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
 
         # Arbitrary test model        
-        params = {'temp_1':21.73,'temp_2':21.73,
-                  'mass_1':3.92*(10**7.93),'mass_2':3.92*(10**4.72),
+        params = {'temp_1':21.73,'temp_2':64.1,
+                  'mass_1':(10**7.93),'mass_2':(10**4.72),
                   'beta_1':2.0,'beta_2':2.0,
-                  'covar_err_1':1.0}
+                  'covar_err_1':0.01}
         test = LnLike(params, bands_frame, gal_dict, fit_dict)
         pdb.set_trace()
 
@@ -202,9 +210,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
     Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a
     list of length n for beta.
-    """
-
-
+    """    
     # Establish the number of model components
     if hasattr(temp, '__iter__') and hasattr(mass, '__iter__'):
         if len(temp) != len(mass):
@@ -214,10 +220,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     elif not hasattr(temp, '__iter__') and not hasattr(mass, '__iter__'):
         n_comp = 1
     else:
-        Exception('Number of dust components needs to be identical for temp and mass variables')
+        Exception('Number of dust components needs to be identical for temp and mass variables')       
         
-        
-
     # As needed, convert variables to arrays
     wavelength = Numpify(wavelength)
     temp = Numpify(temp)
@@ -258,7 +262,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     flux = 0.0
     for m in range(n_comp):
         flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
-
+    
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
