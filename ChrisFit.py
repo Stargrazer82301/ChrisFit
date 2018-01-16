@@ -133,14 +133,14 @@ def Fit(gal_dict,
 
 
 
-        def LnPost(params, bands_frame, fit_dict):
+        def LnPost(params, fit_dict):
             """ Funtion to compute posterior ln-likelihood of the parameters of the proposed model, given some data """
 
             # Caculate prior ln-likelihood of the proposed model parameters
             ln_prior = LnPrior(params, fit_dict)
 
             # Caculate the ln-likelihood of the data, given the proposed model parameters
-            ln_like = LnLike(params, bands_frame, fit_dict)
+            ln_like = LnLike(params, fit_dict)
 
             # Calculate and return the posterior ln-likelihood of the proposed model parameters, given the data
             ln_post = ln_prior + ln_like
@@ -162,18 +162,18 @@ def Fit(gal_dict,
                     'beta_vary':beta_vary,
                     'beta':beta,
                     'covar_unc':covar_unc,
-                    'distance':gal_dict['distance']}
-
+                    'distance':gal_dict['distance']}        
+        """
+        # Arbitrary(ish) test model        
+        params = (21.73,64.1,
+                  10**7.93,10**4.72,
+                  2.0,2.0,
+                  0.01)
+        test = LnLike(params, fit_dict)
+        """
         # Determine number of parameters
-        n_params = (2 * int(components)) + int(fit_dict['beta_vary'])
-        """
-        # Arbitrary test model        
-        params = {'temp_1':21.73,'temp_2':64.1,
-                  'mass_1':(10**7.93),'mass_2':(10**4.72),
-                  'beta_1':2.0,'beta_2':2.0,
-                  'covar_err_1':0.01}
-        test = LnLike(params, bands_frame, fit_dict)
-        """
+        n_params = len(params)#(2 * int(components)) + int(fit_dict['beta_vary'])        
+        
         # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
         MaxLike
@@ -310,37 +310,65 @@ def Numpify(var, n_target=False):
 
 
 
-def ParamsExtract(params, fit_dict):
-    """ Function to extract SED parameters from params dictionary. Resulting parameter tuple is structured:
-    (temp_1, temp_2, ..., temp_n, 
-    mass_1, mass_2, ..., mass_n, 
-    beta_1, beta_2, ..., beta_n, 
-    covar_err_1, covar_err_2, ..., covar_err_n)
-    Note that beta values are only required input if fit_dict['beta_vary'] == True. """
+#def ParamsExtract(params, fit_dict):
+#    """ Function to extract SED parameters from params dictionary. Resulting parameter tuple is structured:
+#    (temp_1, temp_2, ..., temp_n, 
+#    mass_1, mass_2, ..., mass_n, 
+#    beta_1, beta_2, ..., beta_n, 
+#    covar_err_1, covar_err_2, ..., covar_err_n)
+#    Note that beta values are only required input if fit_dict['beta_vary'] == True. """
+#    
+#    # Initiate parameter sub-vectors
+#    temp_vector = []
+#    mass_vector = []
+#    beta_vector = []
+#    covar_err_vector = []
+#    
+#    # Loop over keys of params dictionary, placing temperature, mass, and beta parameters into appropriate sub-vectors
+#    for param_key in sorted(params.keys()):
+#        if 'temp_' in param_key:
+#            temp_vector.append(params[param_key])
+#        elif 'mass_' in param_key:
+#            mass_vector.append(params[param_key])
+#        elif 'beta_' in param_key:
+#            beta_vector.append(params[param_key])
+#        elif 'covar_' in param_key:
+#            covar_err_vector.append(params[param_key])
+#        else:
+#            Exception('Key of entry in parameter dictionary does not match any expected parameter')
+#
+#    # If beta isn't variable, just set beta using value from fit_dict
+#    if not fit_dict['beta_vary']:
+#        beta_vector = copy.deepcopy(fit_dict['beta']) 
+#
+#    # Return parameters tuple
+#    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
     
-    # Initiate parameter sub-vectors
+    
+    
+def ParamsExtract(params, fit_dict):
+    """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
+    (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n, beta_1, beta_2, ..., beta_n);
+    note that beta values are only included if fit_dict['beta_vary'] == True. """
+ 
+    # Initiate and populate dust temperature and dust mass parameter sub-vectors
     temp_vector = []
     mass_vector = []
-    beta_vector = []
-    covar_err_vector = []
+    [ temp_vector.append(params[i]) for i in range(fit_dict['components']) ]
+    [ mass_vector.append(params[i]) for i in range(fit_dict['components'], 2*fit_dict['components']) ]
+ 
+    # Initiate and populate beta parameter sub-vector (from params if beta variable, else from fit_dict otherwise)
+    if fit_dict['beta_vary']:
+        beta_vector = []
+        [ beta_vector.append(params[i]) for i in range(2*fit_dict['components'], 3*fit_dict['components']) ]
+    else:
+        beta_vector = copy.deepcopy(fit_dict['beta'])
     
-    # Loop over keys of params dictionary, placing temperature, mass, and beta parameters into appropriate sub-vectors
-    for param_key in sorted(params.keys()):
-        if 'temp_' in param_key:
-            temp_vector.append(params[param_key])
-        elif 'mass_' in param_key:
-            mass_vector.append(params[param_key])
-        elif 'beta_' in param_key:
-            beta_vector.append(params[param_key])
-        elif 'covar_' in param_key:
-            covar_err_vector.append(params[param_key])
-        else:
-            Exception('Key of entry in parameter dictionary does not match any expected parameter')
-
-    # If beta isn't variable, just set beta using value from fit_dict
-    if not fit_dict['beta_vary']:
-        beta_vector = copy.deepcopy(fit_dict['beta']) 
-
+    # Initiate and populate correlated uncertainty parameter sub-vector
+    covar_err_vector = []
+    if hasattr(fit_dict['covar_unc'], '__iter__'):
+        [ covar_err_vector.append(params[i]) for i in range(3*fit_dict['components'], len(params)) ]
+     
     # Return parameters tuple
     return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
     
