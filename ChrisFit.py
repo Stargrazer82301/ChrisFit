@@ -8,6 +8,7 @@ import numpy as np
 import scipy.stats
 import scipy.interpolate
 import scipy.optimize
+import lmfit
 import emcee
 
 # Define physical constants
@@ -75,49 +76,57 @@ def Fit(gal_dict,
         def LnLike(params, fit_dict):
             """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
 
+            # Deal with parameter bounds, if they are required (for example, if we're doing a maximum-likelihood estimation)
+            if fit_dict['bounds']:
+                if not LikeBounds(params, fit_dict):
+                    return -np.inf
+
             # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
-            
+
             # Extract bands_frame from fit_dict
             bands_frame = fit_dict['bands_frame']
 
             # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
             ln_like = []
             for b in bands_frame.index.values:
-                
+
                 # Skip this band if flux or uncertainty are nan
                 if True in np.isnan([bands_frame.loc[b,'error'],bands_frame.loc[b,'flux']]):
                     continue
 
-                # Calculate predicted flux, given SED parameters                
-                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
-                
-                # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)    
-                col_correct_factor = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector, kappa_0, kappa_0_lambda, beta, verbose=verbose)
-                band_flux_pred *= col_correct_factor[0]      
-                
-                # If there is correlated uncertainty to take account of, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
+                # Calculate predicted flux, given SED parameters
+                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'],
+                                           kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
+
+                # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
+                col_correct_factor = ColourCorrect(band_flux_pred, bands_frame.loc[b], temp_vector, mass_vector,
+                                                   kappa_0, kappa_0_lambda, beta, verbose=verbose)
+                band_flux_pred *= col_correct_factor[0]
+
+                # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
                 band_unc = bands_frame.loc[b,'error']
                 if len(covar_err_vector) > 0:
-                    for c in range(len(fit_dict['covar_unc'])):
-                        covar_param = fit_dict['covar_unc'][c]
+                    for i in range(len(fit_dict['covar_unc'])):
+                        covar_param = fit_dict['covar_unc'][i]
                         if bands_frame.loc[b,'band'] in covar_param['covar_bands']:
                             band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - covar_param['covar_scale']**2.0)
-                            band_flux_pred *= 1 + covar_err_vector[c]                                     
-                
+                            band_flux_pred *= 1 + covar_err_vector[i]
+
                 # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
                 band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
-                
+
                 # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
                 if bands_frame.loc[b,'limit']:
                     if band_flux_pred < bands_frame.loc[b,'flux']:
                         band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
-                        
+
                 # Record ln-likelihood for this band
                 ln_like.append(band_ln_like)
 
             # Calculate and return final data ln-likelihood
-            ln_like = np.sum(np.array(ln_like))            
+            ln_like = np.sum(np.array(ln_like))
+            print(ln_like)
             return ln_like
 
 
@@ -126,7 +135,7 @@ def Fit(gal_dict,
             """ Function to compute prior ln-likelihood of the parameters of the proposed model """
 
             # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, covar_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
 
             # Return prior ln-likelihood
             return
@@ -152,9 +161,13 @@ def Fit(gal_dict,
         if not hasattr(beta, '__iter__'):
             beta = np.array([beta])
         if len(beta) == 1 and components > 1:
-            beta = np.array([beta[0]] * int(components))
-        elif len(beta) != int(components):
+            beta = np.array(beta)
+        elif (len(beta) > 1) and (len(beta)<components) and (components > 1):
             Exception('Either provide a single value of beta, or a list of values of length the number of components')
+
+        # Parse covar_unc argument, so that if no value provided, an empty list is used throughout the rest of the function
+        if not hasattr(covar_unc, '__iter__'):
+            covar_unc = []
 
         # Bundle various fitting argumnts in to a dictionary
         fit_dict = {'bands_frame':bands_frame,
@@ -162,9 +175,9 @@ def Fit(gal_dict,
                     'beta_vary':beta_vary,
                     'beta':beta,
                     'covar_unc':covar_unc,
-                    'distance':gal_dict['distance']}        
+                    'distance':gal_dict['distance']}
         """
-        # Arbitrary(ish) test model        
+        # Arbitrary(ish) test model
         params = (21.73,64.1,
                   10**7.93,10**4.72,
                   2.0,2.0,
@@ -172,14 +185,20 @@ def Fit(gal_dict,
         test = LnLike(params, fit_dict)
         """
         # Determine number of parameters
-        n_params = len(params)#(2 * int(components)) + int(fit_dict['beta_vary'])        
-        
+        n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(covar_unc)
+        fit_dict['covar_unc'] = []
+        # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
+        max_like_initial = MaxLikeInitial(fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
+
         # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
-        MaxLike
-        
+        fit_dict['bounds'] = True
+        max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(fit_dict), method='powell')
+        pdb.set_trace()
+        fit_dict['bounds'] = False
+
         # Initiate emcee affine-invariant ensemble sampler
-        mcmc_n_walkers = 50 
+        mcmc_n_walkers = 50
         mcmc_sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
 
 
@@ -191,7 +210,7 @@ def Fit(gal_dict,
 
 
 
-def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0, covar=None):
+def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0):
     """
     Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
     distance, assuming modified blackbody ('greybody') emission.
@@ -220,7 +239,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
     Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a
     list of length n for beta.
-    """    
+    """
     # Establish the number of model components
     if hasattr(temp, '__iter__') and hasattr(mass, '__iter__'):
         if len(temp) != len(mass):
@@ -230,8 +249,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     elif not hasattr(temp, '__iter__') and not hasattr(mass, '__iter__'):
         n_comp = 1
     else:
-        Exception('Number of dust components needs to be identical for temp and mass variables')       
-        
+        Exception('Number of dust components needs to be identical for temp and mass variables')
+
     # As needed, convert variables to arrays
     wavelength = Numpify(wavelength)
     temp = Numpify(temp)
@@ -272,14 +291,12 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     flux = 0.0
     for m in range(n_comp):
         flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
-    
+
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
     #flux([250E-6,350E-6,500E-6], [21.7,64.1], [3.92*(10**7.93),3.92*(10**4.72)], 25E6, kappa_0=[0.051,0.051], kappa_0_lambda=[500E-6,500E-6], beta=[2.0,2.0])
     return flux
-
-
 
 
 
@@ -310,70 +327,115 @@ def Numpify(var, n_target=False):
 
 
 
-#def ParamsExtract(params, fit_dict):
-#    """ Function to extract SED parameters from params dictionary. Resulting parameter tuple is structured:
-#    (temp_1, temp_2, ..., temp_n, 
-#    mass_1, mass_2, ..., mass_n, 
-#    beta_1, beta_2, ..., beta_n, 
-#    covar_err_1, covar_err_2, ..., covar_err_n)
-#    Note that beta values are only required input if fit_dict['beta_vary'] == True. """
-#    
-#    # Initiate parameter sub-vectors
-#    temp_vector = []
-#    mass_vector = []
-#    beta_vector = []
-#    covar_err_vector = []
-#    
-#    # Loop over keys of params dictionary, placing temperature, mass, and beta parameters into appropriate sub-vectors
-#    for param_key in sorted(params.keys()):
-#        if 'temp_' in param_key:
-#            temp_vector.append(params[param_key])
-#        elif 'mass_' in param_key:
-#            mass_vector.append(params[param_key])
-#        elif 'beta_' in param_key:
-#            beta_vector.append(params[param_key])
-#        elif 'covar_' in param_key:
-#            covar_err_vector.append(params[param_key])
-#        else:
-#            Exception('Key of entry in parameter dictionary does not match any expected parameter')
-#
-#    # If beta isn't variable, just set beta using value from fit_dict
-#    if not fit_dict['beta_vary']:
-#        beta_vector = copy.deepcopy(fit_dict['beta']) 
-#
-#    # Return parameters tuple
-#    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
-    
-    
-    
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
-    (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n, beta_1, beta_2, ..., beta_n);
+    (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
+    covar_err_1, covar_err_2, ..., covar_err_n, beta_1, beta_2, ..., beta_n);
     note that beta values are only included if fit_dict['beta_vary'] == True. """
- 
+
     # Initiate and populate dust temperature and dust mass parameter sub-vectors
     temp_vector = []
     mass_vector = []
     [ temp_vector.append(params[i]) for i in range(fit_dict['components']) ]
     [ mass_vector.append(params[i]) for i in range(fit_dict['components'], 2*fit_dict['components']) ]
- 
+
     # Initiate and populate beta parameter sub-vector (from params if beta variable, else from fit_dict otherwise)
+    beta_vector = []
     if fit_dict['beta_vary']:
-        beta_vector = []
-        [ beta_vector.append(params[i]) for i in range(2*fit_dict['components'], 3*fit_dict['components']) ]
+        beta_index_range_lower = 2 * fit_dict['components']
+        if len(fit_dict['beta']) == 1:
+            beta_index_range_upper = beta_index_range_lower + 1
+        elif len(fit_dict['beta']) == fit_dict['components']:
+            beta_index_range_upper = 3 * fit_dict['components']
+        [ beta_vector.append(params[i]) for i in range(beta_index_range_lower, beta_index_range_upper) ]
     else:
+        beta_index_range_lower = 2 * fit_dict['components']
+        beta_index_range_upper = 2 * fit_dict['components']
         beta_vector = copy.deepcopy(fit_dict['beta'])
-    
+
     # Initiate and populate correlated uncertainty parameter sub-vector
     covar_err_vector = []
     if hasattr(fit_dict['covar_unc'], '__iter__'):
-        [ covar_err_vector.append(params[i]) for i in range(3*fit_dict['components'], len(params)) ]
-     
+        covar_err_index_range_lower = beta_index_range_upper
+        covar_err_index_range_upper = beta_index_range_upper + len(fit_dict['covar_unc'])
+        [ covar_err_vector.append(params[i]) for i in range(covar_err_index_range_lower, covar_err_index_range_upper) ]
+
     # Return parameters tuple
     return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
-    
-    
-    
+
+
+
+def MaxLikeInitial(fit_dict):
+    """ Function to generate initial guess values for maximum-likelihood fitting """
+
+    # Declare list to hold guesses
+    guess = []
+
+    # Temperature guesses for 20K if one MBB; 20K and 50K if two MBB; equally spaced therebetween for 3 or more
+    temp_guess = np.linspace(20.0, 50.0, num=fit_dict['components'])
+    guess += temp_guess.tolist()
+
+    # Mass guesses based on empirical detectability in Herschel bands
+    mass_guess = np.array([5E-9 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_guess *= 10**((temp_guess-20)/-20)
+    guess += mass_guess.tolist()
+
+    # Beta is always guessed to have a value of 2
+    if fit_dict['beta_vary']:
+        beta_guess = np.array(fit_dict['beta'])
+        guess += beta_guess.tolist()
+
+    # Correlated uncertainties are always guessed to have a value of 0
+    if hasattr(fit_dict['covar_unc'], '__iter__'):
+        covar_err_guess = np.array([0.0] * len(fit_dict['covar_unc']))
+        guess += covar_err_guess.tolist()
+
+    # Return tuple of guesses
+    return tuple(guess)
+
+
+
+def LikeBounds(params, fit_dict):
+    """ Function to check whether parameters for a proposed model violate standard boundary conditions. This is for
+    maximum likelihood estimations, where there are no priors to go by. If the parameters are good, the function returns
+    a value of True; else, it returns a value of False."""
+
+    # Extract parameter vectors
+    temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+
+    # Check if there are correlated uncertainty terms; if there are, loop over them
+    if len(covar_err_vector) > 0:
+        for i in range(len(fit_dict['covar_unc'])):
+            covar_param = fit_dict['covar_unc'][i]
+
+            # Make sure proposed correlated uncertainty value doesn't exceed bounds, in case of flat distribution
+            if covar_param['covar_distr'] == 'flat':
+                if covar_err_vector[i] > abs(covar_param['covar_scale']):
+                    return False
+
+    # Check that temperature terms are in order
+    if len(temp_vector) > 1:
+        for i in range(1,len(temp_vector)):
+            if temp_vector[i] < temp_vector[i-1]:
+                return False
+
+    # Check that temperature terms are all physical (ie, temp > 5 kelvin)
+    if np.where(np.array(temp_vector)<5)[0].size > 0:
+        return False
+
+    # Check that mass terms are all physical (ie, mass > 0 Msol)
+    if np.where(np.array(mass_vector)<0)[0].size > 0:
+        return False
+
+    # Check that beta terms are all physical (ie, 1 < beta < 4)
+    if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
+        return False
+
+    # If we've gotten this far, then everything is fine
+    return True
+
+
+
 def ColourCorrect(band_flux_pred, band_frame, temp, mass, kappa_0, kappa_0_lambda, beta, verbose):
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """

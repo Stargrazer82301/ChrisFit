@@ -70,7 +70,7 @@ for g in cat_frame.index:
     out_dict = ChrisFit.Fit(gal_dict,
                             bands_frame_gal,
                             covar_unc = covar_unc,
-                            beta_vary = True,
+                            beta_vary = False,
                             beta = 2.0,
                             components = 2,
                             kappa_0 = 0.077,#0.051,
