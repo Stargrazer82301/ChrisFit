@@ -74,7 +74,7 @@ def Fit(gal_dict,
 
 
         def LnLike(params, fit_dict):
-            """ Funtion to compute ln-likelihood of some data, given the parameters of the proposed model """
+            """ Function to compute ln-likelihood of some data, given the parameters of the proposed model """
 
             # Deal with parameter bounds, if they are required (for example, if we're doing a maximum-likelihood estimation)
             if fit_dict['bounds']:
@@ -100,8 +100,9 @@ def Fit(gal_dict,
                                            kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
 
                 # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
-                col_correct_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], band_frame[b,'band'].split('_')[0], temp_vector, mass_vector,
-                                                   kappa_0, kappa_0_lambda, beta, verbose=verbose)
+                col_correct_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
+                                                   temp_vector, mass_vector, beta,
+                                                   kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
                 band_flux_pred *= col_correct_factor[0]
 
                 # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
@@ -175,7 +176,9 @@ def Fit(gal_dict,
                     'beta_vary':beta_vary,
                     'beta':beta,
                     'covar_unc':covar_unc,
-                    'distance':gal_dict['distance']}
+                    'distance':gal_dict['distance'],
+                    'kappa_0':kappa_0,
+                    'kappa_0_lambda':kappa_0_lambda}
         """
         # Arbitrary(ish) test model
         params = (21.73,64.1,
@@ -186,7 +189,7 @@ def Fit(gal_dict,
         """
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(covar_unc)
-        fit_dict['covar_unc'] = []
+
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         max_like_initial = MaxLikeInitial(fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
@@ -351,7 +354,12 @@ def ParamsExtract(params, fit_dict):
     else:
         beta_index_range_lower = 2 * fit_dict['components']
         beta_index_range_upper = 2 * fit_dict['components']
-        beta_vector = copy.deepcopy(fit_dict['beta'])
+        if len(fit_dict['beta']) == 1:
+            beta_vector = ([fit_dict['beta'][0]] * fit_dict['components'])
+        elif len(fit_dict['beta']) == fit_dict['components']:
+            beta_vector = tuple(fit_dict['components'].tolist())
+    if (len(beta_vector) == 1) and (fit_dict['components'] > 1):
+        beta_vector = [beta_vector[0]] * fit_dict['components']
 
     # Initiate and populate correlated uncertainty parameter sub-vector
     covar_err_vector = []
