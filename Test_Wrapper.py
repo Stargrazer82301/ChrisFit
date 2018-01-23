@@ -26,9 +26,9 @@ plot_dir = None
 
 
 # Create dataframe storing basic band information
-bands_frame = pd.DataFrame({'band':         ['WISE_22','PACS_70','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500'],
-                            'wavelength':   np.array([22E-6, 70E-6, 100E-6, 160E-6, 250E-6, 350E-6, 500E-6]),
-                            'limit':        [True, False, False, False, False, False, False]})
+bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','Spitzer_70','PACS_70','PACS_100','Spitzer_160','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500','Planck_550', 'Planck_850', 'Planck_1380'],
+                            'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
+                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
 
 # Add correlated uncertainty information to band dataframe
 covar_unc = [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
