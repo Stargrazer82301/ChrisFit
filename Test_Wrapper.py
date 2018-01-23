@@ -10,10 +10,8 @@ import ChrisFit
 
 
 
-
-
 # Read DustPedia photometry catalogue into dataframe
-cat_frame = pd.read_csv('DustPedia_Aperture_Photometry_2.2.csv')
+cat_frame = pd.read_csv('DustPedia_Combined_Photometry_2.2.csv')
 
 # State fitting parameters
 beta_vary = True
@@ -41,12 +39,12 @@ settings_dict = {'plotting':True}
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] != 'NGC4030':
+    if cat_frame_gal['name'] != 'NGC5705':
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
     # Create input dictionary for this galaxy
-    gal_dict = {'name':cat_frame.loc[g],
+    gal_dict = {'name':cat_frame_gal['name'],
                 'distance':1E6*cat_frame_gal['dist'],
                 'redshift':3E5/cat_frame_gal['vel_helio']}
 
@@ -62,7 +60,7 @@ for g in cat_frame.index:
             bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
 
         # Prune fluxes with major flags
-        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
+        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N']):
             bands_frame_gal.loc[b,'flux'] = np.NaN
             bands_frame_gal.loc[b,'error'] = np.NaN
 
@@ -70,10 +68,10 @@ for g in cat_frame.index:
     out_dict = ChrisFit.Fit(gal_dict,
                             bands_frame_gal,
                             covar_unc = covar_unc,
-                            beta_vary = False,
+                            beta_vary = True,
                             beta = 2.0,
                             components = 2,
-                            kappa_0 = 0.077,#0.051,
-                            kappa_0_lambda = 850E-6,#500E-6,
+                            kappa_0 = 0.051,
+                            kappa_0_lambda = 500E-6,
                             plot = True)
 

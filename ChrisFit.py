@@ -8,6 +8,7 @@ import numpy as np
 import scipy.stats
 import scipy.interpolate
 import scipy.optimize
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import rc
 import seaborn as sns
@@ -130,8 +131,10 @@ def Fit(gal_dict,
                 ln_like.append(band_ln_like)
 
             # Calculate and return final data ln-likelihood
+            print(np.array(ln_like))
             ln_like = np.sum(np.array(ln_like))
             print(ln_like)
+
             return ln_like
 
 
@@ -162,6 +165,9 @@ def Fit(gal_dict,
 
 
 
+        # Add column to bands_frame, to record which fluxes are larger than their uncertainty
+        bands_frame['det'] = bands_frame.loc[:,'flux'] > bands_frame.loc[:,'error']
+
         # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
         if not hasattr(beta, '__iter__'):
             beta = np.array([beta])
@@ -176,6 +182,7 @@ def Fit(gal_dict,
 
         # Bundle various fitting argumnts in to a dictionary
         fit_dict = {'bands_frame':bands_frame,
+                    'gal_dict':gal_dict,
                     'components':components,
                     'beta_vary':beta_vary,
                     'beta':beta,
@@ -195,14 +202,16 @@ def Fit(gal_dict,
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(covar_unc)
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
-        max_like_initial = MaxLikeInitial(fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
+        max_like_fit_dict = copy.deepcopy(fit_dict)
+        max_like_fit_dict['bounds'] = True
+        max_like_fit_dict['covar_unc'] = False
+        max_like_initial = MaxLikeInitial(max_like_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
-        fit_dict['bounds'] = True
-        max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(fit_dict), method='powell')
+        max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
+        SEDborn(max_like.x, max_like_fit_dict)
         pdb.set_trace()
-        fit_dict['bounds'] = False
 
         # Initiate emcee affine-invariant ensemble sampler
         mcmc_n_walkers = 50
@@ -384,11 +393,12 @@ def MaxLikeInitial(fit_dict):
     guess = []
 
     # Temperature guesses for 20K if one MBB; 20K and 50K if two MBB; equally spaced therebetween for 3 or more
-    temp_guess = np.linspace(20.0, 50.0, num=fit_dict['components'])
+    temp_guess = np.linspace(20.0, 35.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
-    # Mass guesses based on empirical detectability in Herschel bands
-    mass_guess = np.array([5E-9 * fit_dict['distance']**2.0] * fit_dict['components'])
+    # Mass guesses are based on empirical relation, then scale for kappa
+    mass_guess = np.array([1E-8 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_guess *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_guess *= 10**((temp_guess-20)/-20)
     guess += mass_guess.tolist()
 
@@ -448,7 +458,7 @@ def LikeBounds(params, fit_dict):
 
 
 
-def ColourCorrect(wavelength, instrument, temp, mass, kappa_0, kappa_0_lambda, beta, verbose):
+def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa_0_lambda=500E-6, verbose=False):
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
@@ -468,7 +478,7 @@ def ColourCorrect(wavelength, instrument, temp, mass, kappa_0, kappa_0_lambda, b
         data_factor = data_table[data_column]
     except:
         unknown = True
-        if verbose==False:
+        if verbose == True:
             print(' ')
             print('Instrument \''+instrument+'\' not recognised, no colour correction applied.')
 
@@ -635,13 +645,13 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
     ax.set_yscale('log')
     ax.set_xlabel(r'Wavelength ($\mu$m)', fontname=font_family)#, fontsize=17.5)
     ax.set_ylabel('Flux Density (Jy)', fontname=font_family)#, fontsize=17.5)
-    fig.savefig('Test.png', dpi=150)
+    fig.savefig(fit_dict['gal_dict']['name'], dpi=150)
 
-    """# Format font of tick labels
+    # Format font of tick labels
     for xlabel in ax.get_xticklabels():
-        xlabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))
+        xlabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family))#, size=15))
     for ylabel in ax.get_yticklabels():
-        ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))"""
+        ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family))#, size=15))
 
 
 
