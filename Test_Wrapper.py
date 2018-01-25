@@ -60,7 +60,7 @@ for g in cat_frame.index:
             bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
 
         # Prune fluxes with major flags
-        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N']):
+        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
             bands_frame_gal.loc[b,'flux'] = np.NaN
             bands_frame_gal.loc[b,'error'] = np.NaN
 

@@ -58,7 +58,8 @@ def Fit(gal_dict,
                                 (uses Clark et al., 2016, value by default)
             kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
                                 wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
-            plot:               A boolean, stating whether to generate plots of the resulting SED fit
+            plot:               A boolean, stating whether to generate plots of the resulting SED fit; or,
+                                alternatively, a string pointing to the desired plotting output directory
             covar_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
                                 uncertainties; for the 5% Hershcel-SPIRE band covariance, covar_unc would be:
                                 [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
@@ -131,9 +132,9 @@ def Fit(gal_dict,
                 ln_like.append(band_ln_like)
 
             # Calculate and return final data ln-likelihood
-            print(np.array(ln_like))
             ln_like = np.sum(np.array(ln_like))
-            print(ln_like)
+            print(np.sum(ln_like))
+            print(params)
 
             return ln_like
 
@@ -209,6 +210,7 @@ def Fit(gal_dict,
 
         # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
+        #max_like = scipy.optimize.basinhopping(NegLnLike, max_like_initial, args=(max_like_fit_dict))
         max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
         SEDborn(max_like.x, max_like_fit_dict)
         pdb.set_trace()
@@ -508,7 +510,7 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
 
 
 
-def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
+def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     """ Function to plot an SED, with the same information used to produce fit """
 
     # Enable seaborn for easy, attractive plots
@@ -521,7 +523,7 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
     # Initialise figure
     plt.close('all')
     fig = plt.figure(figsize=(8,6))
-    ax = fig.add_axes([0.15, 0.15, 0.825, 0.825])
+    ax = fig.add_axes([0.15, 0.15, 0.80, 0.80])
 
     # Extract band dataframe and parameter vectors
     bands_frame = fit_dict['bands_frame']
@@ -574,6 +576,13 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
 
 
 
+    # Calculate residuals
+    flux_resid = flux_plot - ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector[i])
+    chi = (flux_resid / bands_frame['error'])[bands_frame['limit']==False]
+    chi_squared = chi**2
+
+
+
     # Construct strings containing parameter values
     temp_1_value_string = 'T$_{c}$ = '+str(np.around(temp_vector[0], decimals=3))[0:5]
     mass_1_value_string = ',   M$_{c}$ = '+str(np.around(np.log10(mass_vector[0]), decimals=3))[0:5]
@@ -616,17 +625,16 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
     beta_1_string = beta_1_value_string + beta_1_error_string
 
     # Calculate chi-squared and produce corresponding string
-    chi_squared = np.nan
     chi_squared_string = '$\chi^{2}$ = '+str(np.around(np.sum(chi_squared), decimals=3))[0:5]
 
     # Place text on figure
     string_x_base = 0.035
     string_y_base = 0.925
     string_y_step = 0.06
-    ax.text(0.035, 0.925, fit_dict['gal_dict']['name'], fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
-    ax.text(0.035, 0.865, temp_1_string+mass_1_string, fontsize=14, transform=ax.transAxes, family=font_family)
-    ax.text(0.035, 0.805, temp_2_string+mass_2_string, fontsize=14, transform=ax.transAxes, family=font_family)
-    ax.text(0.035, 0.805-(fit_dict['components']-1)*(0.805-0.745), chi_squared_string+beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, string_y_base, fit_dict['gal_dict']['name'], fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, string_y_base-(1*string_y_step), temp_1_string+mass_1_string, fontsize=14, transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, string_y_base-(2*string_y_step), temp_2_string+mass_2_string, fontsize=14, transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, 0.805-(fit_dict['components']-1)*(0.805-0.745), chi_squared_string+beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
 
 
 
@@ -645,70 +653,6 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
     ax.set_yscale('log')
     ax.set_xlabel(r'Wavelength ($\mu$m)', fontname=font_family)#, fontsize=17.5)
     ax.set_ylabel('Flux Density (Jy)', fontname=font_family)#, fontsize=17.5)
-    fig.savefig(fit_dict['gal_dict']['name'], dpi=150)
-
-    # Format font of tick labels
-    for xlabel in ax.get_xticklabels():
-        xlabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family))#, size=15))
-    for ylabel in ax.get_yticklabels():
-        ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family))#, size=15))
-
-
-
-    pdb.set_trace()
-    fig.savefig('Test.png')
-
-
-
-
-
-
-
-
-    # Assemble strings for plot text in various circumstances
-    chi_squared_string = '$\chi^{2}$ = '+str(np.around(np.sum(chi_squared), decimals=3))[0:5]
-    if bootstrapping==False:
-        T_c_string = 'T$_{c}$ = '+str(np.around(T_c, decimals=3))[0:5]+' K'
-        M_c_string = ',   M$_{c}$ = '+str(np.around(np.log10(M_c), decimals=3))[0:5]+' log$_{10}$M$_{\odot}$'
-        T_w_string = ''
-        M_w_string = ''
-        M_d_string = ''
-        if components==2:
-            T_w_string = 'T$_{w}$ = '+str(np.around(T_w, decimals=3))[0:5]+' K'
-            M_w_string = ',   M$_{w}$ = '+str(np.around(np.log10(M_w), decimals=3))[0:5]+' log$_{10}$M$_{\odot}$'
-            M_d_string = ',   M$_{d}$ = '+str(np.around(np.log10(M_d), decimals=3))[0:5]+' log$_{10}$M$_{\odot}$'
-        if beta_boolean==True:
-            beta_string = ',   $\\beta$ = '+str(np.around(beta, decimals=2))[0:4]
-    """elif bootstrapping==True:
-        T_c_string = 'T$_{c}$ = ('+str(np.around(T_c, decimals=3))[0:5]+' $\pm$ '+str(np.around(bs_T_c_sigma, decimals=3))[0:5]+') K'
-        M_c_string = ',   M$_{c}$ = ('+str(np.around(np.log10(M_c), decimals=3))[0:5]+' $\pm$ '+str(np.around(bs_M_c_sigma_log, decimals=3))[0:5]+') log$_{10}$M$_{\odot}$'
-        T_w_string = ''
-        M_w_string = ''
-        M_d_string = ''
-        if components==2:
-            T_w_string = 'T$_{w}$ = ('+str(np.around(T_w, decimals=3))[0:5]+' $\pm$ '+str(np.around(bs_T_w_sigma, decimals=3))[0:5]+') K'
-            M_w_string = ',   M$_{w}$ = ('+str(np.around(np.log10(M_w), decimals=3))[0:5]+' $\pm$ '+str(np.around(bs_M_w_sigma_log, decimals=3))[0:5]+') log$_{10}$M$_{\odot}$'
-            M_d_string = ',   M$_{d}$ = ('+str(np.around(np.log10(M_d), decimals=3))[0:5]+' $\pm$ '+str(np.around(bs_M_d_sigma_log, decimals=3))[0:5]+') log$_{10}$M$_{\odot}$'
-        if beta_boolean==True:
-            beta_string = ',   $\\beta$ = '+str(np.around(beta, decimals=2))[0:4]+' $\pm$ '+str(np.around( bs_beta_sigma, decimals=3))[0:4]
-    if beta_boolean==False:
-            beta_string = ''"""
-
-    # Place text on figure
-    ax.text(0.035, 0.925, source_name, fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
-    if components==1:
-        ax.text(0.035, 0.865, T_c_string+M_c_string, fontsize=14, transform=ax.transAxes, family=font_family)
-        ax.text(0.035, 0.805, chi_squared_string+beta_string+M_d_string, fontsize=14, transform=ax.transAxes, family=font_family)
-    if components==2:
-        ax.text(0.035, 0.865, T_c_string+M_c_string, fontsize=14, transform=ax.transAxes, family=font_family)
-        ax.text(0.035, 0.805, T_w_string+M_w_string, fontsize=14, transform=ax.transAxes, family=font_family)
-        ax.text(0.035, 0.745, chi_squared_string+beta_string+M_d_string, fontsize=14, transform=ax.transAxes, family=font_family)
-
-    # Set up figure axes
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'Wavelength ($\mu$m)', fontsize=17.5, fontname=font_family)
-    ax.set_ylabel('Flux Density (Jy)', fontsize=17.5, fontname=font_family)
 
     # Format font of tick labels
     for xlabel in ax.get_xticklabels():
@@ -716,45 +660,12 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='serif'):
     for ylabel in ax.get_yticklabels():
         ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))
 
-    # Create seperature flux and error arrays for plot
-    fluxes_plot, errors_plot = np.copy(fluxes_corr), np.copy(errors)
-    errors_up, errors_down = np.copy(errors), np.copy(errors)
 
-    # Format errorbars deal with negative fluxes
-    errors_plot[ np.where( fluxes_plot<=0 ) ] -= fluxes_plot[ np.where( fluxes_plot<=0 ) ]
-    fluxes_plot[ np.where( fluxes_plot<=0 ) ] = 1E-50
 
-    # Format errobars to account for non-detections
-    det = np.where(fluxes_plot>errors_plot)
-    errors_down[ np.where( errors_down > fluxes_plot ) ] = 0.999 * fluxes_plot[ np.where( errors_down > fluxes_plot ) ]
+    # Save plot to image
+    fig.savefig(fit_dict['gal_dict']['name']+'.png', dpi=150)
 
-    # Plot datapoints
-    if (True in limits)==False:
-        ax.errorbar(wavelengths*1E6, fluxes_plot, yerr=[errors_down, errors_up], ecolor='black', elinewidth=1.5, capthick=1.15, marker='x', color='black', markersize=2.5, markeredgewidth=1.5, linewidth=0)
-    else:
-        lim_true, lim_false = np.where( np.array(limits)==True ), np.where( np.array(limits)==False )
-        ax.errorbar(wavelengths[lim_false]*1E6, fluxes_plot[lim_false], yerr=[errors_down[lim_false], errors_up[lim_false]], ecolor='black', elinewidth=1.5, capthick=1.15, marker='x', color='black', markersize=2.5, markeredgewidth=1.5, linewidth=0)
-        ax.errorbar(wavelengths[lim_true]*1E6, fluxes_plot[lim_true], yerr=[errors_down[lim_true], errors_up[lim_true]], ecolor='gray', elinewidth=1.5, capthick=1.15, marker='x', color='gray', markersize=2.5, markeredgewidth=1.5, linewidth=0)
+    # Return figure and axis objects
+    pdb.set_trace()
+    return fig, ax
 
-    # Scale x-axes to account for wavelengths provided
-    xlim_min = 1E6 * 10.0**( np.floor( np.log10( np.min( wavelengths ) ) ) )
-    xlim_max = 1E6 * 10.0**( np.ceil( np.log10( np.max( wavelengths ) ) ) )
-    ax.set_xlim(xlim_min,xlim_max)
-
-    # Scale y-axes to account for range of values and non-detections
-    ylim_min = 10.0**( -1.0 + np.round( np.log10( np.min( fluxes_plot[det] - errors_plot[det] ) ) ) )
-    ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( fluxes_plot[det] + errors_plot[det] ) ) ) )
-    ax.set_ylim(ylim_min,ylim_max)
-
-    # Save figures to designated'Output' folder
-    comp_strings = ['Eh', 'One', 'Two']
-    if output_dir==False:
-        if not os.path.exists('Output'):
-            os.mkdir('Output')
-        fig.savefig( os.path.join('Output',source_name+' '+comp_strings[components]+' Component.png'), dpi=175.0 )
-        if plot_pdf==True:
-            fig.savefig( os.path.join('Output',source_name+' '+comp_strings[components]+' Component.pdf') )
-    if output_dir!=False:
-        fig.savefig( os.path.join(output_dir,source_name+' '+comp_strings[components]+' Component.png'), dpi=175.0 )
-        if plot_pdf==True:
-            fig.savefig( os.path.join(output_dir,source_name+' '+comp_strings[components]+' Component.pdf') )
