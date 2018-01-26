@@ -318,33 +318,6 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
 
 
-def Numpify(var, n_target=False):
-    """ Function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries """
-
-    # If variable is not iterable (ie, a list/array/etc), convert into an appropriate-length list
-    if not hasattr(var, '__iter__'):
-        if not n_target:
-            var = [var]
-        else:
-            var = [var]*n_target
-
-    # If necessary Convert a single-element iterable into a list of length n_targets
-    elif len(var) == 1 and n_target > 1:
-        var = [var[0]]*n_target
-
-    # Object to mis-matched list lengths
-    elif len(var) > 1 and len(var) != n_target:
-        Exception('Variable list must either be of length 1, or of length n_targets')
-
-    # If variable is not a numpy array, turn it into one
-    if not isinstance(var, np.ndarray):
-        var = np.array(var)
-
-    # Return freshly-numpified variable
-    return var
-
-
-
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
     (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
@@ -507,6 +480,33 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
     # Restore old cwd, and return results
     os.chdir(old_cwd)
     return factor, index
+
+
+
+def Numpify(var, n_target=False):
+    """ Function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries """
+
+    # If variable is not iterable (ie, a list/array/etc), convert into an appropriate-length list
+    if not hasattr(var, '__iter__'):
+        if not n_target:
+            var = [var]
+        else:
+            var = [var]*n_target
+
+    # If necessary Convert a single-element iterable into a list of length n_targets
+    elif len(var) == 1 and n_target > 1:
+        var = [var[0]]*n_target
+
+    # Object to mis-matched list lengths
+    elif len(var) > 1 and len(var) != n_target:
+        Exception('Variable list must either be of length 1, or of length n_targets')
+
+    # If variable is not a numpy array, turn it into one
+    if not isinstance(var, np.ndarray):
+        var = np.array(var)
+
+    # Return freshly-numpified variable
+    return var
 
 
 
