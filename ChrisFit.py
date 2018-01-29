@@ -4,6 +4,7 @@ import pdb
 import sys
 import os
 import copy
+import functools
 import numpy as np
 import scipy.stats
 import scipy.interpolate
@@ -33,7 +34,7 @@ def Fit(gal_dict,
         kappa_0 = 0.051,
         kappa_0_lambda = 500E-6,
         plot = True,
-        covar_unc = None,
+        correl_unc = None,
         priors = None,
         full_posterior = False,
         verbose = True):
@@ -60,21 +61,21 @@ def Fit(gal_dict,
                                 wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
             plot:               A boolean, stating whether to generate plots of the resulting SED fit; or,
                                 alternatively, a string pointing to the desired plotting output directory
-            covar_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
-                                uncertainties; for the 5% Hershcel-SPIRE band covariance, covar_unc would be:
-                                [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
-                                'covar_scale':0.04,
-                                'covar_distr':'flat'}],
-                                where 'bands' describes the bands (as named in bands_frame) in question, 'covar_scale'
+            correl_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
+                                uncertainties; for the 5% Hershcel-SPIRE band covariance, correl_unc would be:
+                                [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
+                                'correl_scale':0.04,
+                                'correl_distr':'flat'}],
+                                where 'bands' describes the bands (as named in bands_frame) in question, 'correl_scale'
                                 describes the size of the covariant component of the flux uncertainty (as a fraction of
-                                measured source flux), and 'covar_dist' is the assumed distribution of the uncertainty
-                                (currently accepting either 'flat' or 'normal')
+                                measured source flux), and 'correl_dist' is the assumed distribution of the uncertainty
+                                (currently accepting either 'flat', 'normal', or a defined function)
             priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
                                 'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
                                 components, with the n-th list element being a function giving the ln-like prior for the
                                 parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
                                 that the priors for any correlated uncertainty terms should be provided through the
-                                covar_unc kwarg instead
+                                correl_unc kwarg instead
             full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
                                 returned, or just the summary of median, credible interval, etc
             verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
@@ -90,7 +91,7 @@ def Fit(gal_dict,
                     return -np.inf
 
             # Programatically dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
             # Extract bands_frame from fit_dict
             bands_frame = fit_dict['bands_frame']
@@ -115,12 +116,12 @@ def Fit(gal_dict,
 
                 # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
                 band_unc = bands_frame.loc[b,'error']
-                if len(covar_err_vector) > 0:
-                    for i in range(len(fit_dict['covar_unc'])):
-                        covar_param = fit_dict['covar_unc'][i]
-                        if bands_frame.loc[b,'band'] in covar_param['covar_bands']:
-                            band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - covar_param['covar_scale']**2.0)
-                            band_flux_pred *= 1 + covar_err_vector[i]
+                if len(correl_err_vector) > 0:
+                    for i in range(len(fit_dict['correl_unc'])):
+                        correl_param = fit_dict['correl_unc'][i]
+                        if bands_frame.loc[b,'band'] in correl_param['correl_bands']:
+                            band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
+                            band_flux_pred *= 1 + correl_err_vector[i]
 
                 # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
                 band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
@@ -146,14 +147,34 @@ def Fit(gal_dict,
             """ Function to compute prior ln-likelihood of the parameters of the proposed model """
 
             # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+            temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
             # If a prior kwarg has been given, use that; otherwise, construce a set of default priors
             if isinstance(fit_dict['priors'], dict):
                 priors = fit_dict['priors']
             else:
-                PriorsConstruct(fit_dict)
+                priors = PriorsConstruct(fit_dict)
+
+            # Declare empty list to hold ln-like of each parameter
+            ln_like = []
+
+            # Calculate ln-like for temperature
+            for i in range(fit_dict['components']):
+                ln_like.append(priors['temp'][i](temp_vector[i]))
             pdb.set_trace()
+            # Calculate ln-like for mass
+            for i in range(fit_dict['components']):
+                ln_like.append(priors['mass'][i](mass_vector[i]))
+
+            # Calculate ln-like for beta
+            if fit_dict['beta_vary']:
+                for i in range(len(fit_dict['beta'])):
+                    ln_like.append(priors['beta'][i](beta_vector[i]))
+
+            # Calculate ln-like for correlated uncertainties
+            for i in range(len(correl_err_vector)):
+                pdb.set_trace()
+
             # Return prior ln-likelihood
             return
 
@@ -185,9 +206,9 @@ def Fit(gal_dict,
         elif (len(beta) > 1) and (len(beta)<components) and (components > 1):
             Exception('Either provide a single value of beta, or a list of values of length the number of components')
 
-        # Parse covar_unc argument, so that if no value provided, an empty list is used throughout the rest of the function
-        if not hasattr(covar_unc, '__iter__'):
-            covar_unc = []
+        # Parse correl_unc argument, so that if no value provided, an empty list is used throughout the rest of the function
+        if not hasattr(correl_unc, '__iter__'):
+            correl_unc = []
 
         # Bundle various fitting arguments in to a dictionary
         fit_dict = {'bands_frame':bands_frame,
@@ -195,7 +216,7 @@ def Fit(gal_dict,
                     'components':components,
                     'beta_vary':beta_vary,
                     'beta':beta,
-                    'covar_unc':covar_unc,
+                    'correl_unc':correl_unc,
                     'bounds':False,
                     'priors':priors,
                     'distance':gal_dict['distance'],
@@ -203,12 +224,12 @@ def Fit(gal_dict,
                     'kappa_0_lambda':kappa_0_lambda}
 
         # Determine number of parameters
-        n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(covar_unc)
+        n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         max_like_fit_dict = copy.deepcopy(fit_dict)
         max_like_fit_dict['bounds'] = True
-        max_like_fit_dict['covar_unc'] = False
+        max_like_fit_dict['correl_unc'] = False
         max_like_initial = MaxLikeInitial(max_like_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         """# Find maximum-likelihood solution
@@ -219,6 +240,7 @@ def Fit(gal_dict,
 
         max_like_ngc5584 = ([2.47821284e+01, 2.47821291e+01, 6.97985071e+07, 5.16894686e+05, 1.21395653e+00, 0.0])
         test_post = LnLike(max_like_ngc5584, fit_dict) + LnPrior(max_like_ngc5584, fit_dict)
+        pdb.set_trace()
 
         # Initiate emcee affine-invariant ensemble sampler
         mcmc_n_walkers = 50
@@ -326,7 +348,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
     (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
-    covar_err_1, covar_err_2, ..., covar_err_n, beta_1, beta_2, ..., beta_n);
+    correl_err_1, correl_err_2, ..., correl_err_n, beta_1, beta_2, ..., beta_n);
     note that beta values are only included if fit_dict['beta_vary'] == True. """
 
     # Initiate and populate dust temperature and dust mass parameter sub-vectors
@@ -355,14 +377,14 @@ def ParamsExtract(params, fit_dict):
         beta_vector = [beta_vector[0]] * fit_dict['components']
 
     # Initiate and populate correlated uncertainty parameter sub-vector
-    covar_err_vector = []
-    if hasattr(fit_dict['covar_unc'], '__iter__'):
-        covar_err_index_range_lower = beta_index_range_upper
-        covar_err_index_range_upper = beta_index_range_upper + len(fit_dict['covar_unc'])
-        [ covar_err_vector.append(params[i]) for i in range(covar_err_index_range_lower, covar_err_index_range_upper) ]
+    correl_err_vector = []
+    if hasattr(fit_dict['correl_unc'], '__iter__'):
+        correl_err_index_range_lower = beta_index_range_upper
+        correl_err_index_range_upper = beta_index_range_upper + len(fit_dict['correl_unc'])
+        [ correl_err_vector.append(params[i]) for i in range(correl_err_index_range_lower, correl_err_index_range_upper) ]
 
     # Return parameters tuple
-    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(covar_err_vector))
+    return (tuple(temp_vector), tuple(mass_vector), tuple(beta_vector), tuple(correl_err_vector))
 
 
 
@@ -377,7 +399,7 @@ def MaxLikeInitial(fit_dict):
     guess += temp_guess.tolist()
 
     # Mass guesses are based on empirical relation, then scale for kappa
-    mass_guess = np.array([1E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_guess = np.array([5E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
     mass_guess *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_guess *= 10**((temp_guess-20)/-20)
     guess += mass_guess.tolist()
@@ -388,9 +410,9 @@ def MaxLikeInitial(fit_dict):
         guess += beta_guess.tolist()
 
     # Correlated uncertainties are always guessed to have a value of 0
-    if hasattr(fit_dict['covar_unc'], '__iter__'):
-        covar_err_guess = np.array([0.0] * len(fit_dict['covar_unc']))
-        guess += covar_err_guess.tolist()
+    if hasattr(fit_dict['correl_unc'], '__iter__'):
+        correl_err_guess = np.array([0.0] * len(fit_dict['correl_unc']))
+        guess += correl_err_guess.tolist()
 
     # Return tuple of guesses
     return tuple(guess)
@@ -444,16 +466,16 @@ def LikeBounds(params, fit_dict):
     a value of True; else, it returns a value of False."""
 
     # Extract parameter vectors
-    temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
     # Check if there are correlated uncertainty terms; if there are, loop over them
-    if len(covar_err_vector) > 0:
-        for i in range(len(fit_dict['covar_unc'])):
-            covar_param = fit_dict['covar_unc'][i]
+    if len(correl_err_vector) > 0:
+        for i in range(len(fit_dict['correl_unc'])):
+            correl_param = fit_dict['correl_unc'][i]
 
             # Make sure proposed correlated uncertainty value doesn't exceed bounds, in case of flat distribution
-            if covar_param['covar_distr'] == 'flat':
-                if covar_err_vector[i] > abs(covar_param['covar_scale']):
+            if correl_param['correl_distr'] == 'flat':
+                if correl_err_vector[i] > abs(correl_param['correl_scale']):
                     return False
 
     # Check that temperature terms are in order
@@ -573,7 +595,7 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
 
     # Extract band dataframe and parameter vectors
     bands_frame = fit_dict['bands_frame']
-    temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
     # Select only bands of interest
     bands_frame = bands_frame.loc[np.isnan(bands_frame['flux']) == False]

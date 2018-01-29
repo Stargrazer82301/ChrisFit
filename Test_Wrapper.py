@@ -28,9 +28,9 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','S
                             'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
 
 # Add correlated uncertainty information to band dataframe
-covar_unc = [{'covar_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
-              'covar_scale':0.04,
-              'covar_distr':'flat'}]
+correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
+               'correl_scale':0.04,
+               'correl_distr':'flat'}]
 
 # Initiate settings dictionary
 settings_dict = {'plotting':True}
@@ -66,7 +66,7 @@ for g in cat_frame.index:
     # Call ChrisFit
     out_dict = ChrisFit.Fit(gal_dict,
                             bands_frame_gal,
-                            covar_unc = covar_unc,
+                            correl_unc = correl_unc,
                             beta_vary = True,
                             beta = 2.0,
                             components = 2,
