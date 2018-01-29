@@ -71,9 +71,9 @@ def Fit(gal_dict,
                                 (currently accepting either 'flat' or 'normal')
             priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
                                 'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
-                                components, with the n-th list element being a function giving the prior for the
+                                components, with the n-th list element being a function giving the ln-like prior for the
                                 parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
-                                that the priosr for any correlated uncertainty terms should be provided through the
+                                that the priors for any correlated uncertainty terms should be provided through the
                                 covar_unc kwarg instead
             full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
                                 returned, or just the summary of median, credible interval, etc
@@ -409,24 +409,29 @@ def PriorsConstruct(fit_dict):
     # Define function to find scaling factor for gamma distribution of given mode, alpha, and location
     GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
 
-    # Create temperature priors (using gamma distribution)
+    # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
     temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
     temp_mode = np.linspace(18.0, 35.0, num=fit_dict['components'])
     temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
     for i in range(fit_dict['components']):
-        priors['temp'].append( scipy.stats.gamma( temp_alpha[i], loc=temp_phi[i], scale=GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i]) ) )
+        temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
+        temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
+        priors['temp'].append(temp_ln_like)
 
-    # Create mass priors (using log-t distribution)
+    # Create mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
     mass_mode = np.array([1E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_mode *= 10**((temp_mode-18)/-15)
     mass_mode = np.log10(mass_mode)
     mass_sigma = np.array([2.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
-        priors['mass'].append( lambda mass: 10.0**scipy.stats.t.pdf(mass, loc=mass_mode[i], scale=mass_sigma[i]) )
+        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(mass, loc=mass_mode, scale=mass_sigma))
+        priors['mass'].append(mass_ln_like)
 
-    # Create beta priors (using gamma distribution)
-    priors['beta'] = [scipy.stats.gamma(5, loc=0, scale=3.0/8.0)] * fit_dict['components']
+    # Create beta priors, using gamma distribution
+    if fit_dict['beta_vary']:
+        beta_ln_like = lambda beta: np.log(scipy.stats.gamma(5, loc=0, scale=3.0/8.0))
+        priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
     # Return comleted priors dictionary
     return priors
