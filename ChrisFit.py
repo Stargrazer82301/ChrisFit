@@ -54,7 +54,7 @@ def Fit(gal_dict,
                                 provide starting position for MCMC
             components:         An integer, stating how many modified blackbody components should make up the model
                                 being fit
-            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to caculate dust mass
+            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to cacculate dust mass
                                 (uses Clark et al., 2016, value by default)
             kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
                                 wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
@@ -67,12 +67,14 @@ def Fit(gal_dict,
                                 'covar_distr':'flat'}],
                                 where 'bands' describes the bands (as named in bands_frame) in question, 'covar_scale'
                                 describes the size of the covariant component of the flux uncertainty (as a fraction of
-                                measured source flux), and 'covar_dist' is the distribution of the uncertainty
+                                measured source flux), and 'covar_dist' is the assumed distribution of the uncertainty
                                 (currently accepting either 'flat' or 'normal')
             priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
                                 'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
                                 components, with the n-th list element being a function giving the prior for the
-                                parameter in question (ie, temperature, mass, or beta) of the n-th model component
+                                parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
+                                that the priosr for any correlated uncertainty terms should be provided through the
+                                covar_unc kwarg instead
             full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
                                 returned, or just the summary of median, credible interval, etc
             verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
@@ -87,7 +89,7 @@ def Fit(gal_dict,
                 if not LikeBounds(params, fit_dict):
                     return -np.inf
 
-            # Programatically dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
+            # Programatically dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
 
             # Extract bands_frame from fit_dict
@@ -133,8 +135,8 @@ def Fit(gal_dict,
 
             # Calculate and return final data ln-likelihood
             ln_like = np.sum(np.array(ln_like))
-            print(np.sum(ln_like))
             print(params)
+            print(np.sum(ln_like))
 
             return ln_like
 
@@ -146,6 +148,12 @@ def Fit(gal_dict,
             # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
             temp_vector, mass_vector, beta_vector, covar_err_vector = ParamsExtract(params, fit_dict)
 
+            # If a prior kwarg has been given, use that; otherwise, construce a set of default priors
+            if isinstance(fit_dict['priors'], dict):
+                priors = fit_dict['priors']
+            else:
+                PriorsConstruct(fit_dict)
+            pdb.set_trace()
             # Return prior ln-likelihood
             return
 
@@ -154,10 +162,10 @@ def Fit(gal_dict,
         def LnPost(params, fit_dict):
             """ Funtion to compute posterior ln-likelihood of the parameters of the proposed model, given some data """
 
-            # Caculate prior ln-likelihood of the proposed model parameters
+            # Calculate prior ln-likelihood of the proposed model parameters
             ln_prior = LnPrior(params, fit_dict)
 
-            # Caculate the ln-likelihood of the data, given the proposed model parameters
+            # Calculate the ln-likelihood of the data, given the proposed model parameters
             ln_like = LnLike(params, fit_dict)
 
             # Calculate and return the posterior ln-likelihood of the proposed model parameters, given the data
@@ -181,24 +189,19 @@ def Fit(gal_dict,
         if not hasattr(covar_unc, '__iter__'):
             covar_unc = []
 
-        # Bundle various fitting argumnts in to a dictionary
+        # Bundle various fitting arguments in to a dictionary
         fit_dict = {'bands_frame':bands_frame,
                     'gal_dict':gal_dict,
                     'components':components,
                     'beta_vary':beta_vary,
                     'beta':beta,
                     'covar_unc':covar_unc,
+                    'bounds':False,
+                    'priors':priors,
                     'distance':gal_dict['distance'],
                     'kappa_0':kappa_0,
                     'kappa_0_lambda':kappa_0_lambda}
-        """
-        # Arbitrary(ish) test model
-        params = (21.73,64.1,
-                  10**7.93,10**4.72,
-                  2.0,2.0,
-                  0.01)
-        test = LnLike(params, fit_dict)
-        """
+
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(covar_unc)
 
@@ -208,12 +211,14 @@ def Fit(gal_dict,
         max_like_fit_dict['covar_unc'] = False
         max_like_initial = MaxLikeInitial(max_like_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
-        # Find maximum-likelihood solution
+        """# Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
         #max_like = scipy.optimize.basinhopping(NegLnLike, max_like_initial, args=(max_like_fit_dict))
         max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
-        SEDborn(max_like.x, max_like_fit_dict)
-        pdb.set_trace()
+        SEDborn(max_like.x, max_like_fit_dict)"""
+
+        max_like_ngc5584 = ([2.47821284e+01, 2.47821291e+01, 6.97985071e+07, 5.16894686e+05, 1.21395653e+00, 0.0])
+        test_post = LnLike(max_like_ngc5584, fit_dict) + LnPrior(max_like_ngc5584, fit_dict)
 
         # Initiate emcee affine-invariant ensemble sampler
         mcmc_n_walkers = 50
@@ -230,7 +235,7 @@ def Fit(gal_dict,
 
 def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0):
     """
-    Function to caculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
+    Function to calculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
     distance, assuming modified blackbody ('greybody') emission.
 
     Arguments:
@@ -242,11 +247,11 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     Keyword arguments:
         kappa_0:        A float, or list of floats, giving the dust mass absorption coefficient(s) (in m**2 kg**-1),
                         kappa, of each dust component; reference wavelengths given by kwarg kappa_0_lambda
-        kappa_0_lambda: A float, or list of floats, giving the reference wavelength (in m) coresponding to each value
+        kappa_0_lambda: A float, or list of floats, giving the reference wavelength (in m) corresponding to each value
                         of kappa_0
         beta:           A float, or list of floats, giving the dust emissivity slope(s), beta, of each dust component
 
-    If wavelenghth is given as a list, a list of output fluxes will be given, corresponding to the calculated flux at
+    If wavelength is given as a list, a list of output fluxes will be given, corresponding to the calculated flux at
     each wavelength.
 
     Temperature and mass can be set to be lists , corresponding to multiple dust components. For n components, both
@@ -666,6 +671,5 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     fig.savefig(fit_dict['gal_dict']['name']+'.png', dpi=150)
 
     # Return figure and axis objects
-    pdb.set_trace()
     return fig, ax
 

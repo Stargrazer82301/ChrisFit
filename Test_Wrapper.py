@@ -22,7 +22,6 @@ lambda_0 = 500E-6
 plot_make = True
 plot_dir = None
 
-
 # Create dataframe storing basic band information
 bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','Spitzer_70','PACS_70','PACS_100','Spitzer_160','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500','Planck_550', 'Planck_850', 'Planck_1380'],
                             'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
@@ -39,7 +38,7 @@ settings_dict = {'plotting':True}
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] != 'NGC5705':
+    if cat_frame_gal['name'] != 'NGC5584':
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
