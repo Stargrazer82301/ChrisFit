@@ -419,18 +419,18 @@ def PriorsConstruct(fit_dict):
         priors['temp'].append(temp_ln_like)
 
     # Create mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
-    mass_mode = np.array([1E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_mode = np.array([5E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_mode *= 10**((temp_mode-18)/-15)
     mass_mode = np.log10(mass_mode)
     mass_sigma = np.array([2.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
-        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(mass, loc=mass_mode, scale=mass_sigma))
+        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
         priors['mass'].append(mass_ln_like)
 
     # Create beta priors, using gamma distribution
     if fit_dict['beta_vary']:
-        beta_ln_like = lambda beta: np.log(scipy.stats.gamma(5, loc=0, scale=3.0/8.0))
+        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 5, loc=0, scale=3.0/8.0))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
     # Return comleted priors dictionary
