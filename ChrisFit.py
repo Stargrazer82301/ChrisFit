@@ -372,12 +372,12 @@ def MaxLikeInitial(fit_dict):
     # Declare list to hold guesses
     guess = []
 
-    # Temperature guesses for 20K if one MBB; 20K and 50K if two MBB; equally spaced therebetween for 3 or more
-    temp_guess = np.linspace(20.0, 35.0, num=fit_dict['components'])
+    # Temperature guesses for 18K if one MBB; 18K and 50K if two MBB; equally spaced therebetween for 3 or more
+    temp_guess = np.linspace(18.0, 35.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
     # Mass guesses are based on empirical relation, then scale for kappa
-    mass_guess = np.array([1E-8 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_guess = np.array([1E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
     mass_guess *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_guess *= 10**((temp_guess-20)/-20)
     guess += mass_guess.tolist()
@@ -394,6 +394,42 @@ def MaxLikeInitial(fit_dict):
 
     # Return tuple of guesses
     return tuple(guess)
+
+
+
+def PriorsConstruct(fit_dict):
+    """ Function to auitomatically construct a set of default priors, given the basic parameters of the model as
+    described by the ChrisFit input """
+
+    # Initialise dictionary to hold priors
+    priors = {'temp':[],
+              'mass':[],
+              'beta':[]}
+
+    # Define function to find scaling factor for gamma distribution of given mode, alpha, and location
+    GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
+
+    # Create temperature priors (using gamma distribution)
+    temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
+    temp_mode = np.linspace(18.0, 35.0, num=fit_dict['components'])
+    temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
+    for i in range(fit_dict['components']):
+        priors['temp'].append( scipy.stats.gamma( temp_alpha[i], loc=temp_phi[i], scale=GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i]) ) )
+
+    # Create mass priors (using log-t distribution)
+    mass_mode = np.array([1E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
+    mass_mode *= 10**((temp_mode-18)/-15)
+    mass_mode = np.log10(mass_mode)
+    mass_sigma = np.array([2.0] * fit_dict['components'])
+    for i in range(fit_dict['components']):
+        priors['mass'].append( lambda mass: 10.0**scipy.stats.t.pdf(mass, loc=mass_mode[i], scale=mass_sigma[i]) )
+
+    # Create beta priors (using gamma distribution)
+    priors['beta'] = [scipy.stats.gamma(5, loc=0, scale=3.0/8.0)] * fit_dict['components']
+
+    # Return comleted priors dictionary
+    return priors
 
 
 
