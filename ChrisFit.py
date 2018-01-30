@@ -4,18 +4,20 @@ import pdb
 import sys
 import os
 import copy
-import functools
+import dill
 import numpy as np
 import scipy.stats
 import scipy.interpolate
 import scipy.optimize
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rc
 import seaborn as sns
-import lmfit
+import multiprocessing as mp
+import corner
 import emcee
-from ChrisFuncs import PercentileError
+
+# Disable interactive plotting
+plt.ioff()
 
 # Define physical constants
 c = 3E8
@@ -68,7 +70,7 @@ def Fit(gal_dict,
                                 'correl_distr':'flat'}],
                                 where 'bands' describes the bands (as named in bands_frame) in question, 'correl_scale'
                                 describes the size of the covariant component of the flux uncertainty (as a fraction of
-                                measured source flux), and 'correl_dist' is the assumed distribution of the uncertainty
+                                measured source flux), and 'correl_distr' is the assumed distribution of the uncertainty
                                 (currently accepting either 'flat', 'normal', or a defined function)
             priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
                                 'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
@@ -80,119 +82,6 @@ def Fit(gal_dict,
                                 returned, or just the summary of median, credible interval, etc
             verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
             """
-
-
-        def LnLike(params, fit_dict):
-            """ Function to compute ln-likelihood of some data, given the parameters of the proposed model """
-
-            # Deal with parameter bounds, if they are required (for example, if we're doing a maximum-likelihood estimation)
-            if fit_dict['bounds']:
-                if not LikeBounds(params, fit_dict):
-                    return -np.inf
-
-            # Programatically dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
-
-            # Extract bands_frame from fit_dict
-            bands_frame = fit_dict['bands_frame']
-
-            # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
-            ln_like = []
-            for b in bands_frame.index.values:
-
-                # Skip this band if flux or uncertainty are nan
-                if True in np.isnan([bands_frame.loc[b,'error'],bands_frame.loc[b,'flux']]):
-                    continue
-
-                # Calculate predicted flux, given SED parameters
-                band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'],
-                                           kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta_vector)
-
-                # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
-                col_correct_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
-                                                   temp_vector, mass_vector, beta,
-                                                   kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
-                band_flux_pred *= col_correct_factor[0]
-
-                # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
-                band_unc = bands_frame.loc[b,'error']
-                if len(correl_err_vector) > 0:
-                    for i in range(len(fit_dict['correl_unc'])):
-                        correl_param = fit_dict['correl_unc'][i]
-                        if bands_frame.loc[b,'band'] in correl_param['correl_bands']:
-                            band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
-                            band_flux_pred *= 1 + correl_err_vector[i]
-
-                # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
-                band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
-
-                # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
-                if bands_frame.loc[b,'limit']:
-                    if band_flux_pred < bands_frame.loc[b,'flux']:
-                        band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
-
-                # Record ln-likelihood for this band
-                ln_like.append(band_ln_like)
-
-            # Calculate and return final data ln-likelihood
-            ln_like = np.sum(np.array(ln_like))
-            print(params)
-            print(np.sum(ln_like))
-
-            return ln_like
-
-
-
-        def LnPrior(params, fit_dict):
-            """ Function to compute prior ln-likelihood of the parameters of the proposed model """
-
-            # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
-            temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
-
-            # If a prior kwarg has been given, use that; otherwise, construce a set of default priors
-            if isinstance(fit_dict['priors'], dict):
-                priors = fit_dict['priors']
-            else:
-                priors = PriorsConstruct(fit_dict)
-
-            # Declare empty list to hold ln-like of each parameter
-            ln_like = []
-
-            # Calculate ln-like for temperature
-            for i in range(fit_dict['components']):
-                ln_like.append(priors['temp'][i](temp_vector[i]))
-            pdb.set_trace()
-            # Calculate ln-like for mass
-            for i in range(fit_dict['components']):
-                ln_like.append(priors['mass'][i](mass_vector[i]))
-
-            # Calculate ln-like for beta
-            if fit_dict['beta_vary']:
-                for i in range(len(fit_dict['beta'])):
-                    ln_like.append(priors['beta'][i](beta_vector[i]))
-
-            # Calculate ln-like for correlated uncertainties
-            for i in range(len(correl_err_vector)):
-                pdb.set_trace()
-
-            # Return prior ln-likelihood
-            return
-
-
-
-        def LnPost(params, fit_dict):
-            """ Funtion to compute posterior ln-likelihood of the parameters of the proposed model, given some data """
-
-            # Calculate prior ln-likelihood of the proposed model parameters
-            ln_prior = LnPrior(params, fit_dict)
-
-            # Calculate the ln-likelihood of the data, given the proposed model parameters
-            ln_like = LnLike(params, fit_dict)
-
-            # Calculate and return the posterior ln-likelihood of the proposed model parameters, given the data
-            ln_post = ln_prior + ln_like
-            return ln_post
-
 
 
         # Add column to bands_frame, to record which fluxes are larger than their uncertainty
@@ -232,24 +121,173 @@ def Fit(gal_dict,
         max_like_fit_dict['correl_unc'] = False
         max_like_initial = MaxLikeInitial(max_like_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
-        """# Find maximum-likelihood solution
+        # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
-        #max_like = scipy.optimize.basinhopping(NegLnLike, max_like_initial, args=(max_like_fit_dict))
-        max_like = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
-        SEDborn(max_like.x, max_like_fit_dict)"""
+        #max_like_opt = scipy.optimize.basinhopping(NegLnLike, max_like_initial, args=(max_like_fit_dict))
+        max_like_opt = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
+        max_like = max_like_opt.x
+        """#SEDborn(max_like, max_like_fit_dict)
+        max_like = ([2.47821284e+01, 2.47821291e+01, 6.97985071e+07, 5.16894686e+05, 1.21395653e+00, 0.0])"""
 
-        max_like_ngc5584 = ([2.47821284e+01, 2.47821291e+01, 6.97985071e+07, 5.16894686e+05, 1.21395653e+00, 0.0])
-        test_post = LnLike(max_like_ngc5584, fit_dict) + LnPrior(max_like_ngc5584, fit_dict)
-        pdb.set_trace()
+        # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
+        max_like = np.array(max_like.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+
+        # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
+        mcmc_n_walkers = 100
+        mcmc_initial = [max_like + 1e-4*np.random.randn(len(max_like)) for i in range(mcmc_n_walkers)]
 
         # Initiate emcee affine-invariant ensemble sampler
-        mcmc_n_walkers = 50
-        mcmc_sampler = emcee.EnsembleSampler(n_walkers, n_params, LnPost, args=(bands_frame, fit_dict))
+        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=mp.cpu_count()-1)
+
+        # Run emcee
+        mcmc_sampler.run_mcmc(mcmc_initial, 10000)
+
+        # Extract chains
+        mcmc_samples = mcmc_sampler.chain[:, 50:, :].reshape((-1, n_params))
+        dill.dump(mcmc_samples, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
+        #mcmc_samples = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+
+        # Plot posterior corner diagrams (with histograms hidden)
+        param_names = [r'$T_{c}$',r'$T_{w}$',r'$M_{c}$',r'$M_{w}$',r'$\beta$',r'$\upsilon_{SPIRE}$']
+        fig_corner = corner.corner(mcmc_samples,
+                                   labels=param_names,
+                                   quantiles=[0.16,0.5,0.84],
+                                   range=[0.9999]*len(param_names),
+                                   show_titles=True,
+                                   truths=max_like,
+                                   hist_kwargs={'edgecolor':'black'})
+        fig_corner.savefig('/home/user/spx7cjc/Desktop/Corner.png')
+        pdb.set_trace()
 
 
 
 
 
+
+def LnLike(params, fit_dict):
+    """ Function to compute ln-likelihood of some data, given the parameters of the proposed model """
+
+    # Deal with parameter bounds, if they are required (for example, if we're doing a maximum-likelihood estimation)
+    if fit_dict['bounds']:
+        if not LikeBounds(params, fit_dict):
+            return -np.inf
+
+    # Programatically dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
+
+    # Extract bands_frame from fit_dict
+    bands_frame = fit_dict['bands_frame']
+
+    # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
+    ln_like = []
+    for b in bands_frame.index.values:
+
+        # Skip this band if flux or uncertainty are nan
+        if True in np.isnan([bands_frame.loc[b,'error'],bands_frame.loc[b,'flux']]):
+            continue
+
+        # Calculate predicted flux, given SED parameters
+        band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'],
+                                   kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
+
+        # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
+        col_correct_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
+                                           temp_vector, mass_vector, beta_vector,
+                                           kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
+        band_flux_pred *= col_correct_factor[0]
+
+        # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
+        band_unc = bands_frame.loc[b,'error']
+        if len(correl_err_vector) > 0:
+            for i in range(len(fit_dict['correl_unc'])):
+                correl_param = fit_dict['correl_unc'][i]
+                if bands_frame.loc[b,'band'] in correl_param['correl_bands']:
+                    band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
+                    band_flux_pred *= 1 + correl_err_vector[i]
+
+        # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
+        band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
+
+        # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
+        if bands_frame.loc[b,'limit']:
+            if band_flux_pred < bands_frame.loc[b,'flux']:
+                band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
+
+        # Record ln-likelihood for this band
+        ln_like.append(band_ln_like)
+
+    # Calculate and return final data ln-likelihood
+    ln_like = np.sum(np.array(ln_like))
+    return ln_like
+
+
+
+def LnPrior(params, fit_dict):
+    """ Function to compute prior ln-likelihood of the parameters of the proposed model """
+
+    # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
+
+    # If a prior kwarg has been given, use that; otherwise, construce a set of default priors
+    if isinstance(fit_dict['priors'], dict):
+        priors = fit_dict['priors']
+    else:
+        priors = PriorsConstruct(fit_dict)
+
+    # Declare empty list to hold ln-like of each parameter
+    ln_like = []
+
+    # Calculate ln-like for temperature
+    for i in range(fit_dict['components']):
+        ln_like.append(priors['temp'][i](temp_vector[i]))
+
+    # Calculate ln-like for mass
+    for i in range(fit_dict['components']):
+        ln_like.append(priors['mass'][i](mass_vector[i]))
+
+    # Calculate ln-like for beta
+    if fit_dict['beta_vary']:
+        for i in range(len(fit_dict['beta'])):
+            ln_like.append(priors['beta'][i](beta_vector[i]))
+
+    # Calculate ln-like for correlated uncertainties; if a user provides function in the kwarg, use that
+    for i in range(len(correl_err_vector)):
+        if callable(fit_dict['correl_unc'][i]['correl_distr']):
+            ln_like.append(np.log(fit_dict['correl_unc'][i]['correl_distr'](correl_err_vector[i])))
+
+        # If user has said in kwarg that uncertainty correlation has normal distributed, compute accordingly
+        elif fit_dict['correl_unc'][i]['correl_distr'] == 'normal':
+            ln_like.append(np.log(scipy.stats.norm.pdf(correl_err_vector[i], scale=fit_dict['correl_unc'][i]['correl_scale'], loc=0.0)))
+
+        # If user has said in kwarg that uncertainty correlation has flat distribution, compite accordingly
+        elif fit_dict['correl_unc'][i]['correl_distr'] == 'flat':
+            if abs(correl_err_vector[i]) <= fit_dict['correl_unc'][i]['correl_scale']:
+                ln_like.append(0)
+            else:
+                ln_like.append(-np.inf)
+
+    # Calculate and return final prior log-likelihood
+    ln_like = np.sum(np.array(ln_like))
+    return ln_like
+
+
+
+def LnPost(params, fit_dict):
+    """ Funtion to compute posterior ln-likelihood of the parameters of the proposed model, given some data """
+
+    # Calculate prior ln-likelihood of the proposed model parameters
+    ln_prior = LnPrior(params, fit_dict)
+
+    # Calculate the ln-likelihood of the data, given the proposed model parameters
+    ln_like = LnLike(params, fit_dict)
+
+    # Calculate posterior ln-likelihood of the proposed model parameters, given the data and the priors
+    ln_post = ln_prior + ln_like
+
+    # Check that posterior ln-likelihood is legitimate, and return it
+    if np.isnan(ln_post):
+        ln_post = -np.inf
+    return ln_post
 
 
 
@@ -452,7 +490,7 @@ def PriorsConstruct(fit_dict):
 
     # Create beta priors, using gamma distribution
     if fit_dict['beta_vary']:
-        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 5, loc=0, scale=3.0/8.0))
+        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3, loc=0, scale=1))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
     # Return comleted priors dictionary

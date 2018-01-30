@@ -38,7 +38,7 @@ settings_dict = {'plotting':True}
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] != 'NGC5584':
+    if cat_frame_gal['name'] != 'NGC5705':
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
