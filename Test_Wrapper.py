@@ -27,10 +27,22 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','S
                             'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
                             'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
 
+# Construct function for SPIRE correlated uncertainty
+def SpireCorrelUnc(prop, unc=0.04):
+    if abs(prop) > (2*unc):
+        return -np.inf
+    else:
+        x = np.linspace(-2*unc, 2*unc, 5E3)
+        y = np.zeros([x.size])
+        y[np.where(np.abs(x)<=unc)] = 1
+        y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
+        return y[(np.abs(x-prop)).argmin()]
+
+
 # Add correlated uncertainty information to band dataframe
 correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
                'correl_scale':0.04,
-               'correl_distr':'flat'}]
+               'correl_distr':SpireCorrelUnc}]
 
 # Initiate settings dictionary
 settings_dict = {'plotting':True}
