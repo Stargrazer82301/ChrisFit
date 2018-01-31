@@ -3,6 +3,8 @@ import pdb
 import os
 import copy
 import numpy as np
+import scipy.stats
+import scipy.ndimage
 import pandas as pd
 import matplotlib.pyplot as plt
 import ChrisFuncs
@@ -50,7 +52,7 @@ settings_dict = {'plotting':True}
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] != 'NGC5705':
+    if cat_frame_gal['name'] not in ['NGC3683','NGC5584','NGC5705']:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
@@ -84,5 +86,5 @@ for g in cat_frame.index:
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
-                            plot = True)
+                            plot = 'Output/')
 

@@ -5,6 +5,9 @@ import sys
 import os
 import copy
 import dill
+import re
+from difflib import SequenceMatcher
+import multiprocessing as mp
 import numpy as np
 import scipy.stats
 import scipy.interpolate
@@ -12,7 +15,7 @@ import scipy.optimize
 import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
-import multiprocessing as mp
+from sklearn.neighbors import KernelDensity
 import corner
 import emcee
 
@@ -114,7 +117,7 @@ def Fit(gal_dict,
 
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
-
+        PriorsConstruct(fit_dict)
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         max_like_fit_dict = copy.deepcopy(fit_dict)
         max_like_fit_dict['bounds'] = True
@@ -227,6 +230,8 @@ def LnLike(params, fit_dict):
 
 
 
+
+
 def LnPrior(params, fit_dict):
     """ Function to compute prior ln-likelihood of the parameters of the proposed model """
 
@@ -274,6 +279,8 @@ def LnPrior(params, fit_dict):
     # Calculate and return final prior log-likelihood
     ln_like = np.sum(np.array(ln_like))
     return ln_like
+
+
 
 
 
@@ -388,6 +395,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
 
 
+
+
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
     (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
@@ -491,10 +500,16 @@ def MaxLikeInitial(fit_dict):
     temp_guess = np.linspace(18.0, 35.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
+    # Use flux and distance to estimate likely cold dust mass, based on empirical relation
+    bands_frame = fit_dict['bands_frame']
+    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    peak_lum = peak_flux * fit_dict['distance']**2.0
+    peak_mass = 10**(np.log10(peak_lum)-8)
+
     # Mass guesses are based on empirical relation, then scale for kappa
-    mass_guess = np.array([5E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
+    mass_guess = np.array([peak_mass] * fit_dict['components'])
     mass_guess *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
-    mass_guess *= 10**((temp_guess-20)/-20)
+    mass_guess *= 10**((temp_guess-18)/-15)
     guess += mass_guess.tolist()
 
     # Beta is always guessed to have a value of 2
@@ -509,6 +524,8 @@ def MaxLikeInitial(fit_dict):
 
     # Return tuple of guesses
     return tuple(guess)
+
+
 
 
 
@@ -533,8 +550,14 @@ def PriorsConstruct(fit_dict):
         temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
         priors['temp'].append(temp_ln_like)
 
-    # Create mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
-    mass_mode = np.array([5E-10 * fit_dict['distance']**2.0] * fit_dict['components'])
+    # Use flux and distance to estimate likely cold dust mass, based on empirical relation
+    bands_frame = fit_dict['bands_frame']
+    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    peak_lum = peak_flux * fit_dict['distance']**2.0
+    peak_mass = 10**(np.log10(peak_lum)-8)
+
+    # Use likely cold dust mass to construct mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
+    mass_mode = np.array([peak_mass] * fit_dict['components'])
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_mode *= 10**((temp_mode-18)/-15)
     mass_mode = np.log10(mass_mode)
@@ -550,6 +573,8 @@ def PriorsConstruct(fit_dict):
 
     # Return comleted priors dictionary
     return priors
+
+
 
 
 
@@ -591,6 +616,8 @@ def LikeBounds(params, fit_dict):
 
     # If we've gotten this far, then everything is fine
     return True
+
+
 
 
 
@@ -644,6 +671,8 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
 
 
 
+
+
 def Numpify(var, n_target=False):
     """ Function for checking if variable is a list, and (if necessary) converting to a n_target length list of identical entries """
 
@@ -671,12 +700,14 @@ def Numpify(var, n_target=False):
 
 
 
+
+
 def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     """ Function to plot an SED, with the same information used to produce fit """
 
     # Enable seaborn for easy, attractive plots
     plt.ioff()
-    sns.set(context='poster') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
+    sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
     sns.set_style('ticks')
 
 
