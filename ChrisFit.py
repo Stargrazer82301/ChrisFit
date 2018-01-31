@@ -123,42 +123,47 @@ def Fit(gal_dict,
 
         # Find maximum-likelihood solution
         NegLnLike = lambda *args: -LnLike(*args)
-        #max_like_opt = scipy.optimize.basinhopping(NegLnLike, max_like_initial, args=(max_like_fit_dict))
-        max_like_opt = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell')
+        #max_like_opt = scipy.optimize.basinhopping(NegLnLike, max_like_initial, minimizer_kwargs={'args':(max_like_fit_dict)})
+        max_like_opt = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell', tol=1E-5)
         max_like = max_like_opt.x
-        """#SEDborn(max_like, max_like_fit_dict)
-        max_like = ([2.47821284e+01, 2.47821291e+01, 6.97985071e+07, 5.16894686e+05, 1.21395653e+00, 0.0])"""
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         max_like = np.array(max_like.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
         # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
-        mcmc_n_walkers = 100
+        mcmc_n_walkers = 200
+        mcmc_n_steps = 5000
         mcmc_initial = [max_like + 1e-4*np.random.randn(len(max_like)) for i in range(mcmc_n_walkers)]
 
-        # Initiate emcee affine-invariant ensemble sampler
-        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=mp.cpu_count()-1)
+        # Initiate and run emcee affine-invariant ensemble sampler
+        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=mp.cpu_count())
+        mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
 
-        # Run emcee
-        mcmc_sampler.run_mcmc(mcmc_initial, 10000)
+        # Examine autocorrelation of MCMC chains, to identify burn-in
+        mcmc_n_burn = 0.2 * mcmc_n_steps
 
-        # Extract chains
-        mcmc_samples = mcmc_sampler.chain[:, 50:, :].reshape((-1, n_params))
+        # Combine MCMC chains into final posteriors for each parameter
+        mcmc_samples = mcmc_sampler.chain[:, mcmc_n_burn:, :].reshape((-1, n_params))
         dill.dump(mcmc_samples, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
         #mcmc_samples = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
-        # Plot posterior corner diagrams (with histograms hidden)
-        param_names = [r'$T_{c}$',r'$T_{w}$',r'$M_{c}$',r'$M_{w}$',r'$\beta$',r'$\upsilon_{SPIRE}$']
-        fig_corner = corner.corner(mcmc_samples,
-                                   labels=param_names,
-                                   quantiles=[0.16,0.5,0.84],
-                                   range=[0.9999]*len(param_names),
-                                   show_titles=True,
-                                   truths=max_like,
-                                   hist_kwargs={'edgecolor':'black'})
-        fig_corner.savefig('/home/user/spx7cjc/Desktop/Corner.png')
-        pdb.set_trace()
+        # Plot posterior corner plot
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), max_like.copy(), fit_dict)
+        if plot == True:
+            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
+        # Plot median SED
+        sed_fig, sed_ax = SEDborn(np.median(mcmc_samples, axis=0), fit_dict)
+        if plot == True:
+            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
 
 
 
@@ -816,11 +821,58 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     for ylabel in ax.get_yticklabels():
         ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))
 
-
-
-    # Save plot to image
-    fig.savefig(fit_dict['gal_dict']['name']+'.png', dpi=150)
-
     # Return figure and axis objects
     return fig, ax
 
+
+
+
+
+def CornerPlot(mcmc_samples, max_like, fit_dict):
+    """ Function to produce corner plot of posterior distribution, replacing histograms with KDEs, and with the maximum
+    likelihood solution shown """
+
+    # Enable seaborn for easy, attractive plots
+    plt.ioff()
+    sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
+    sns.set_style('ticks')
+
+    # Generate label strings for parameter names
+    labels = ParamsLabel(fit_dict)
+
+    # Convert mass parameters into logarithmic space
+    for i in range(len(labels)):
+        if labels[i][:2] == '$M':
+            mcmc_samples[:,i] = np.log10(mcmc_samples[:,i])
+            max_like[i] = np.log10(max_like[i])
+
+    # Plot posterior corner diagrams (with histograms hidden)
+    fig = corner.corner(mcmc_samples,
+                        labels=labels,
+                        quantiles=[0.16,0.5,0.84],
+                        range=[0.9999]*len(labels),
+                        show_titles=True,
+                        truths=max_like,
+                        hist_kwargs={'edgecolor':'none'})
+
+    # Loop over variables and subplots, finding histogram subplot corresponding to each variable
+    for i in range(len(labels)):
+        label = labels[i]
+        for ax in fig.get_axes():
+            if ax.get_title()[:len(label)] == label:
+
+                # Now we've found the correct subplot for this variable, plot the KDE (with twice Freedman-Diaconis bandwidth)
+                values = np.array(mcmc_samples[:,i])[:,np.newaxis]
+                bandwidth = 2.0 * ( 2.0 * (np.percentile(values,75)-np.percentile(values,25)) ) / values.size**0.333#np.ptp(np.histogram(trace.get_values(varname),bins='fd')[1][:2])
+                kde = KernelDensity(kernel='epanechnikov', bandwidth=bandwidth).fit(values)
+                line_x = np.linspace(np.nanmin(values), np.nanmax(values), 10000)[:,np.newaxis]
+                line_y = kde.score_samples(line_x)
+                line_y = np.exp(line_y)
+                line_y = line_y * 0.9 * max(ax.get_ylim()) * line_y.max()**-1
+                ax.plot(line_x,line_y, color='black')
+
+            # Also, set tick marks to point inside plots
+            ax.tick_params(direction='in')
+
+    # Return final figure and axes objects
+    return fig, ax
