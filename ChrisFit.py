@@ -426,6 +426,56 @@ def ParamsExtract(params, fit_dict):
 
 
 
+
+
+def ParamsLabel(fit_dict):
+    """ Function to generate list of plot-ready labels for free parameters """
+
+    # Initiate list to hold labels
+    labels = []
+
+    # Depending on how many components there are, generate subscripts for mass and temperature parameters
+    if fit_dict['components'] == 1:
+        subs = ['']
+    elif fit_dict['components'] == 2:
+        subs = ['_{c}','_{w}']
+    else:
+        subs = range(1,fit_dict['components']+1)
+        subs = ['_{'+str(subs[i])+'}' for i in range(len(subs))]
+
+    # Add temperature and mass labels to list
+    for i in range(fit_dict['components']):
+        labels.append(r'$T'+subs[i]+'$')
+    for i in range(fit_dict['components']):
+        labels.append(r'$M'+subs[i]+'$')
+
+    # Generate beta labels (depending on how many beta parameters there are) and add them to list
+    if fit_dict['beta_vary']:
+        if len(fit_dict['beta']) == 1:
+            labels.append(r'$\beta$')
+        elif len(fit_dict['beta']) == fit_dict['components']:
+            for i in range(fit_dict['components']):
+                labels.append(r'$\beta'+subs[i]+'$')
+
+    # Generate correlated uncertainty labels (if necessary) and add them to list
+    if hasattr(fit_dict['correl_unc'], '__iter__'):
+        for i in range(len(fit_dict['correl_unc'])):
+            band_first = re.compile('[^a-zA-Z]').sub('',fit_dict['correl_unc'][i]['correl_bands'][0])
+            band_last = re.compile('[^a-zA-Z]').sub('',fit_dict['correl_unc'][i]['correl_bands'][-1:][0])
+            band_match = SequenceMatcher(None, band_first, band_last).find_longest_match(0, len(band_first), 0, len(band_last))
+            if band_match.size == 0:
+                instr = band_first
+            else:
+                instr = band_first[band_match.a:band_match.size]
+                labels.append(r'$\upsilon_{'+instr+'}$')
+
+    # Return list of labels
+    return labels
+
+
+
+
+
 def MaxLikeInitial(fit_dict):
     """ Function to generate initial guess values for maximum-likelihood fitting """
 
