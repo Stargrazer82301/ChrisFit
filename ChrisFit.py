@@ -850,13 +850,13 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     chi_squared_string = '$\chi^{2}$ = '+str(np.around(np.sum(chi_squared), decimals=3))[0:5]
 
     # Place text on figure
-    string_x_base = 0.035
-    string_y_base = 0.925
-    string_y_step = 0.06
+    string_x_base = 0.015
+    string_y_base = 0.95
+    string_y_step = 0.055
     ax.text(string_x_base, string_y_base, fit_dict['gal_dict']['name'], fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
     ax.text(string_x_base, string_y_base-(1*string_y_step), temp_1_string+mass_1_string, fontsize=14, transform=ax.transAxes, family=font_family)
     ax.text(string_x_base, string_y_base-(2*string_y_step), temp_2_string+mass_2_string, fontsize=14, transform=ax.transAxes, family=font_family)
-    ax.text(string_x_base, 0.805-(fit_dict['components']-1)*(0.805-0.745), chi_squared_string+beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, string_y_base-((fit_dict['components']+1)*string_y_step), chi_squared_string+beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
 
 
 
@@ -866,8 +866,8 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     ax.set_xlim(xlim_min,xlim_max)
 
     # Scale y-axes to account for range of values and non-detections
-    ylim_min = 10.0**( -1.0 + np.round( np.log10( np.min( bands_frame['flux'].where(bands_frame['det']) - error_plot[bands_frame['det']] ) ) ) )
-    ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( bands_frame['flux'].where(bands_frame['det']) + error_plot[bands_frame['det']] ) ) ) )
+    ylim_min = 10.0**( -1.0 + np.round( np.log10( np.min( flux_plot[bands_frame['det']] - error_plot[bands_frame['det']] ) ) ) )
+    ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot[bands_frame['det']] + error_plot[bands_frame['det']] ) ) ) )
     ax.set_ylim(ylim_min,ylim_max)
 
     # Format figure axes and labels
