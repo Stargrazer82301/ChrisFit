@@ -27,7 +27,7 @@ plot_dir = None
 # Create dataframe storing basic band information
 bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','Spitzer_70','PACS_70','PACS_100','Spitzer_160','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500','Planck_550', 'Planck_850', 'Planck_1380'],
                             'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
-                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
+                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, True, True]})
 
 # Construct function for SPIRE correlated uncertainty
 def SpireCorrelUnc(prop, unc=0.04):
@@ -49,10 +49,13 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 # Initiate settings dictionary
 settings_dict = {'plotting':True}
 
+# List target galaxies
+target_gals = ['NGC4030''NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
+
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in ['NGC3683','NGC5584','NGC5705']:
+    if cat_frame_gal['name'] not in ['NGC5584']:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
@@ -73,7 +76,7 @@ for g in cat_frame.index:
             bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
 
         # Prune fluxes with major flags
-        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
+        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N']):
             bands_frame_gal.loc[b,'flux'] = np.NaN
             bands_frame_gal.loc[b,'error'] = np.NaN
 
@@ -86,5 +89,7 @@ for g in cat_frame.index:
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
+                            mcmc_n_walkers = 100,
+                            mcmc_n_steps = 1000,
                             plot = 'Output/')
 
