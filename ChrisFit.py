@@ -13,9 +13,11 @@ import scipy.stats
 import scipy.interpolate
 import scipy.optimize
 import matplotlib
+#matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import KernelDensity
+import joblib
 import corner
 import emcee
 
@@ -41,6 +43,8 @@ def Fit(gal_dict,
         plot = True,
         correl_unc = None,
         priors = None,
+        mcmc_n_walkers = 250,
+        mcmc_n_steps = 2500,
         full_posterior = False,
         verbose = True):
         """
@@ -60,7 +64,7 @@ def Fit(gal_dict,
                                 provide starting position for MCMC
             components:         An integer, stating how many modified blackbody components should make up the model
                                 being fit
-            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to cacculate dust mass
+            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to calculate dust mass
                                 (uses Clark et al., 2016, value by default)
             kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
                                 wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
@@ -81,7 +85,7 @@ def Fit(gal_dict,
                                 parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
                                 that the priors for any correlated uncertainty terms should be provided through the
                                 correl_unc kwarg instead
-            full_posterior:     A boolean, stating whether the full posterior distribution of each paramter should be
+            full_posterior:     A boolean, stating whether the full posterior distribution of each parameter should be
                                 returned, or just the summary of median, credible interval, etc
             verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
             """
@@ -117,7 +121,7 @@ def Fit(gal_dict,
 
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
-        PriorsConstruct(fit_dict)
+
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         max_like_fit_dict = copy.deepcopy(fit_dict)
         max_like_fit_dict['bounds'] = True
@@ -160,7 +164,7 @@ def Fit(gal_dict,
                     corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
         # Plot median SED
-        sed_fig, sed_ax = SEDborn(np.median(mcmc_samples, axis=0), fit_dict)
+        sed_fig, sed_ax = SEDborn(np.median(mcmc_samples, axis=0), fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
@@ -702,7 +706,7 @@ def Numpify(var, n_target=False):
 
 
 
-def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
+def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     """ Function to plot an SED, with the same information used to produce fit """
 
     # Enable seaborn for easy, attractive plots
@@ -725,7 +729,7 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     bands_frame = bands_frame.loc[np.isnan(bands_frame['flux']) == False]
 
     # Generate fit components
-    fit_wavelengths = np.linspace(10E-6, 10000E-6, num=10000)
+    fit_wavelengths = np.logspace(-5, -2, num=2000)
     fit_fluxes = np.zeros([fit_dict['components'], len(fit_wavelengths)])
     for i in range(fit_dict['components']):
         fit_fluxes[i,:] = ModelFlux(fit_wavelengths, temp_vector[i], mass_vector[i], fit_dict['distance'],
@@ -738,7 +742,7 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
     ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
 
     # Colour-correct fluxes according to model being plotted
-    bands_frame['flux_corr'] = bands_frame['flux'].copy()
+    bands_frame.loc[:,'flux_corr'] = bands_frame['flux'].copy()
     for b in bands_frame.index:
         colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
                                            temp_vector, mass_vector, beta_vector,
@@ -925,6 +929,7 @@ def CornerPlot(mcmc_samples, max_like, fit_dict):
                 # Now we've found the correct subplot for this variable, plot the KDE (with twice Freedman-Diaconis bandwidth)
                 values = np.array(mcmc_samples[:,i])[:,np.newaxis]
                 bandwidth = 2.0 * ( 2.0 * (np.percentile(values,75)-np.percentile(values,25)) ) / values.size**0.333#np.ptp(np.histogram(trace.get_values(varname),bins='fd')[1][:2])
+                bandwidth = max(bandwidth, 0.01)
                 kde = KernelDensity(kernel='epanechnikov', bandwidth=bandwidth).fit(values)
                 line_x = np.linspace(np.nanmin(values), np.nanmax(values), 10000)[:,np.newaxis]
                 line_y = kde.score_samples(line_x)
