@@ -768,10 +768,40 @@ def SEDborn(params, fit_dict, params_dist=False, font_family='sans'):
 
 
 
-    # Calculate residuals
+    # Calculate residuals and chi-squared
     flux_resid = flux_plot - ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector[i])
     chi = (flux_resid / bands_frame['error'])[bands_frame['limit']==False]
     chi_squared = chi**2
+
+
+
+    # If parameter distribution provided, produce a thinned version to compute uncertainties
+    if isinstance(posterior, np.ndarray):
+        post = posterior[np.random.choice(range(posterior.shape[0]), size=min(5000,posterior.shape[0]), replace=False), :]
+
+        # Generate SEDs for each sample of the thinned posterior, for individual components and for combined model
+        post_wavelengths = np.logspace(-5, -2, num=500)
+        post_fluxes_indv = np.zeros([post.shape[0], post_wavelengths.shape[0], fit_dict['components']])
+        post_fluxes_tot = np.zeros([post.shape[0], post_wavelengths.shape[0]])
+        for i in range(fit_dict['components']):
+            for j in range(post.shape[0]):
+                post_temp_vector, post_mass_vector, post_beta_vector, post_correl_err_vector = ParamsExtract(post[j,:], fit_dict)
+                post_fluxes_indv[j,:,i] = ModelFlux(post_wavelengths, post_temp_vector[i], post_mass_vector[i], fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=post_beta_vector[i])
+        post_fluxes_tot[:,:] = np.sum(post_fluxes_indv[:,:,:], axis=2)
+
+        # Work out 16th and 84th percentile fluxes at each wavelength
+        lim_fluxes_indv = np.zeros([2, post_wavelengths.shape[0], fit_dict['components']])
+        lim_fluxes_tot = np.zeros([2, post_wavelengths.shape[0]])
+        for i in range(fit_dict['components']):
+            lim_fluxes_indv[0,:,i] = np.percentile(post_fluxes_indv[:,:,i], 16, axis=0)
+            lim_fluxes_indv[1,:,i] = np.percentile(post_fluxes_indv[:,:,i], 84, axis=0)
+        lim_fluxes_tot[0,:] = np.percentile(post_fluxes_tot, 16, axis=0)
+        lim_fluxes_tot[1,:] = np.percentile(post_fluxes_tot, 84, axis=0)
+
+        # Plot shaded regions
+        for i in range(fit_dict['components']):
+            ax.fill_between(post_wavelengths*1E6, lim_fluxes_indv[0,:,i], lim_fluxes_indv[1,:,i], facecolor='gray', alpha=0.25)
+        ax.fill_between(post_wavelengths*1E6, lim_fluxes_tot[0,:,], lim_fluxes_tot[1,:], facecolor='red', alpha=0.25)
 
 
 
