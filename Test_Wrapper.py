@@ -2,9 +2,12 @@
 import pdb
 import os
 import copy
+import warnings
+warnings.filterwarnings('ignore')
 import numpy as np
 import scipy.stats
 import scipy.ndimage
+import scipy.interpolate
 import pandas as pd
 import matplotlib.pyplot as plt
 import ChrisFuncs
@@ -27,19 +30,16 @@ plot_dir = None
 # Create dataframe storing basic band information
 bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','Spitzer_70','PACS_70','PACS_100','Spitzer_160','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500','Planck_550', 'Planck_850', 'Planck_1380'],
                             'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
-                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, True, True]})
+                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
 
 # Construct function for SPIRE correlated uncertainty
-def SpireCorrelUnc(prop, unc=0.04):
-    if abs(prop) > (2*unc):
-        return -np.inf
-    else:
-        x = np.linspace(-2*unc, 2*unc, 5E3)
-        y = np.zeros([x.size])
-        y[np.where(np.abs(x)<=unc)] = 1
-        y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
-        return y[(np.abs(x-prop)).argmin()]
 
+spire_correl_unc = 0.04
+spire_correl_x = np.linspace(-0.1,0.1,1E3)
+spire_correl_y = np.zeros([spire_correl_x.size])
+spire_correl_y[np.where(np.abs(spire_correl_x)<=spire_correl_unc)] = 1
+spire_correl_y = scipy.ndimage.filters.gaussian_filter1d(spire_correl_y, sigma=len(spire_correl_x)*(0.005/(spire_correl_x.max()-spire_correl_x.min())))
+SpireCorrelUnc = scipy.interpolate.interp1d(spire_correl_x, spire_correl_y, bounds_error='fill', fill_value=-np.inf)
 
 # Add correlated uncertainty information to band dataframe
 correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
@@ -55,7 +55,7 @@ target_gals = ['NGC4030''NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC57
 # Loop over galaxies
 for g in cat_frame.index:
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in ['NGC5584']:
+    if cat_frame_gal['name'] not in target_gals:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
@@ -89,7 +89,7 @@ for g in cat_frame.index:
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
-                            mcmc_n_walkers = 100,
-                            mcmc_n_steps = 1000,
+                            mcmc_n_walkers = 50,
+                            mcmc_n_steps = 500,
                             plot = 'Output/')
 
