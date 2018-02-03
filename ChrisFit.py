@@ -17,6 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import KernelDensity
+from progress.bar import IncrementalBar
 import joblib
 import corner
 import emcee
@@ -121,41 +122,65 @@ def Fit(gal_dict,
 
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
+        fit_dict['n_params'] = n_params
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
-        max_like_fit_dict = copy.deepcopy(fit_dict)
-        max_like_fit_dict['bounds'] = True
-        max_like_fit_dict['correl_unc'] = False
-        max_like_initial = MaxLikeInitial(max_like_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
+        mle_fit_dict = copy.deepcopy(fit_dict)
+        mle_fit_dict['bounds'] = True
+        mle_fit_dict['correl_unc'] = False
+        mle_initial = MaxLikeInitial(mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
-        # Find maximum-likelihood solution
+        # Find Maximum Likelihood Estimate (MLE)
         NegLnLike = lambda *args: -LnLike(*args)
-        #max_like_opt = scipy.optimize.basinhopping(NegLnLike, max_like_initial, minimizer_kwargs={'args':(max_like_fit_dict)})
-        max_like_opt = scipy.optimize.minimize(NegLnLike, max_like_initial, args=(max_like_fit_dict), method='powell', tol=1E-5)
-        max_like = max_like_opt.x
+        #mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_initial, minimizer_kwargs={'args':(mle_fit_dict)})
+        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='powell', tol=1E-5)
+        mle_params = mle_opt.x
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
-        max_like = np.array(max_like.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+        mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
         # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
-        mcmc_n_walkers = 200
-        mcmc_n_steps = 5000
-        mcmc_initial = [max_like + 1e-4*np.random.randn(len(max_like)) for i in range(mcmc_n_walkers)]
+        mcmc_initial = [(mle_params + (1E-1 * mle_params * np.random.randn(len(mle_params))) + (1E-3 * np.random.randn(len(mle_params)))) for i in range(mcmc_n_walkers)]
 
         # Initiate and run emcee affine-invariant ensemble sampler
-        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=mp.cpu_count())
-        mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
+        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.25)))
+        mcmc_bar = IncrementalBar('Sampling posterior with emcee', max=mcmc_n_steps, suffix='%(percent)d%% [%(elapsed_td)s / %(eta_td)s]')
+        for i, result in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
+            mcmc_bar.next()
+        mcmc_bar.finish()
+        #mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
+        mcmc_chains = mcmc_sampler.chain
+        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        pdb.set_trace()
 
-        # Examine autocorrelation of MCMC chains, to identify burn-in
-        mcmc_n_burn = 0.2 * mcmc_n_steps
+        # Examine and plot autocorrelation of MCMC chains, to identify burn-in
+        """autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
+        if plot == True:
+            autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
+        mcmc_n_burn = int(0.2 * mcmc_n_steps)
+
+        # Plot trace of MCMC chains
+        """trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_n_burn, fit_dict)
+        if plot == True:
+            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
 
         # Combine MCMC chains into final posteriors for each parameter
-        mcmc_samples = mcmc_sampler.chain[:, mcmc_n_burn:, :].reshape((-1, n_params))
-        dill.dump(mcmc_samples, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
-        #mcmc_samples = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        mcmc_samples = mcmc_chains[:, mcmc_n_burn:, :].reshape((-1, n_params))
+        #dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
+
+        # Find Maximum A Posteriori Estimate (MAPE)
+        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
 
         # Plot posterior corner plot
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), max_like.copy(), fit_dict)
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
         elif plot != False:
@@ -164,7 +189,7 @@ def Fit(gal_dict,
                     corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
         # Plot median SED
-        sed_fig, sed_ax = SEDborn(np.median(mcmc_samples, axis=0), fit_dict, posterior=mcmc_samples)
+        sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
@@ -184,7 +209,7 @@ def LnLike(params, fit_dict):
         if not LikeBounds(params, fit_dict):
             return -np.inf
 
-    # Programatically dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
+    # Programatically extract dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
     temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
     # Extract bands_frame from fit_dict
@@ -765,10 +790,10 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
     # Plot datapoints
     if np.sum(bands_frame['limit']) == 0:
-        ax.errorbar(bands_frame['wavelength']*1E6, flux_plot, yerr=[errorbar_up, errorbar_down], ecolor='black', elinewidth=1.5, capthick=1.5, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+        ax.errorbar(bands_frame['wavelength']*1E6, flux_plot, yerr=[errorbar_up, errorbar_down], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
     else:
-        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=1.5, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
-        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']], yerr=[errorbar_down[bands_frame['limit']], errorbar_up[bands_frame['limit']]], ecolor='gray', elinewidth=1.5, capthick=1.5, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']], yerr=[errorbar_down[bands_frame['limit']], errorbar_up[bands_frame['limit']]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
 
 
 
@@ -781,7 +806,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
     # If parameter distribution provided, produce a thinned version to compute uncertainties
     if isinstance(posterior, np.ndarray):
-        post = posterior[np.random.choice(range(posterior.shape[0]), size=min(5000,posterior.shape[0]), replace=False), :]
+        post = posterior[np.random.choice(range(posterior.shape[0]), size=min(2000,posterior.shape[0]), replace=False), :]
 
         # Generate SEDs for each sample of the thinned posterior, for individual components and for combined model
         post_wavelengths = np.logspace(-5, -2, num=500)
@@ -804,8 +829,8 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
         # Plot shaded regions
         for i in range(fit_dict['components']):
-            ax.fill_between(post_wavelengths*1E6, lim_fluxes_indv[0,:,i], lim_fluxes_indv[1,:,i], facecolor='gray', alpha=0.25)
-        ax.fill_between(post_wavelengths*1E6, lim_fluxes_tot[0,:,], lim_fluxes_tot[1,:], facecolor='red', alpha=0.25)
+            ax.fill_between(post_wavelengths*1E6, lim_fluxes_indv[0,:,i], lim_fluxes_indv[1,:,i], facecolor='gray', edgecolor='none', linewidth=0, alpha=0.25)
+        ax.fill_between(post_wavelengths*1E6, lim_fluxes_tot[0,:,], lim_fluxes_tot[1,:], facecolor='red', edgecolor='none', linewidth=0, alpha=0.25)
 
 
 
@@ -855,7 +880,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
     # Place text on figure
     string_x_base = 0.015
-    string_y_base = 0.95
+    string_y_base = 0.945
     string_y_step = 0.055
     ax.text(string_x_base, string_y_base, fit_dict['gal_dict']['name'], fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
     ax.text(string_x_base, string_y_base-(1*string_y_step), temp_1_string+mass_1_string, fontsize=14, transform=ax.transAxes, family=font_family)
@@ -893,7 +918,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
 
 
-def CornerPlot(mcmc_samples, max_like, fit_dict):
+def CornerPlot(mcmc_samples, mle, fit_dict):
     """ Function to produce corner plot of posterior distribution, replacing histograms with KDEs, and with the maximum
     likelihood solution shown """
 
@@ -909,15 +934,15 @@ def CornerPlot(mcmc_samples, max_like, fit_dict):
     for i in range(len(labels)):
         if labels[i][:2] == '$M':
             mcmc_samples[:,i] = np.log10(mcmc_samples[:,i])
-            max_like[i] = np.log10(max_like[i])
+            mle[i] = np.log10(mle[i])
 
     # Plot posterior corner diagrams (with histograms hidden)
     fig = corner.corner(mcmc_samples,
                         labels=labels,
                         quantiles=[0.16,0.5,0.84],
-                        range=[0.9999]*len(labels),
+                        range=[0.99999]*len(labels),
                         show_titles=True,
-                        truths=max_like,
+                        truths=mle,
                         hist_kwargs={'edgecolor':'none'})
 
     # Loop over variables and subplots, finding histogram subplot corresponding to each variable
@@ -942,3 +967,23 @@ def CornerPlot(mcmc_samples, max_like, fit_dict):
 
     # Return final figure and axes objects
     return fig, ax
+
+
+
+def Autocorr(mcmc_chains, fit_dict):
+    """ Function to analyse the autocorrelation of the MCMC chains to identify burnin """
+
+    # Enable seaborn for easy, attractive plots
+    plt.ioff()
+    sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
+    sns.set_style('ticks')
+    pallette = sns.color_palette('muted', n_colors=fit_dict['n_params'])
+
+    # Generate figure, with subplot for each parameter
+    labels = ParamsLabel(fit_dict)
+    fig, ax = plt.subplots(nrows=fit_dict['n_params'], ncols=1)
+
+
+
+def TracePlot(mcmc_chains, mcmc_n_burn, fit_dict):
+    """ Function to produce a trace plot showing the MCMC chains """

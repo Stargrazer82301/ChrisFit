@@ -7,7 +7,6 @@ warnings.filterwarnings('ignore')
 import numpy as np
 import scipy.stats
 import scipy.ndimage
-import scipy.interpolate
 import pandas as pd
 import matplotlib.pyplot as plt
 import ChrisFuncs
@@ -33,13 +32,16 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','S
                             'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
 
 # Construct function for SPIRE correlated uncertainty
+def SpireCorrelUnc(prop, unc=0.04):
+    if abs(prop) > (5*unc):
+        return -np.inf
+    else:
+        x = np.linspace(-5*unc, 5*unc, 1E3)
+        y = np.zeros([x.size])
+        y[np.where(np.abs(x)<=unc)] = 1
+        y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
+        return y[(np.abs(x-prop)).argmin()]
 
-spire_correl_unc = 0.04
-spire_correl_x = np.linspace(-0.1,0.1,1E3)
-spire_correl_y = np.zeros([spire_correl_x.size])
-spire_correl_y[np.where(np.abs(spire_correl_x)<=spire_correl_unc)] = 1
-spire_correl_y = scipy.ndimage.filters.gaussian_filter1d(spire_correl_y, sigma=len(spire_correl_x)*(0.005/(spire_correl_x.max()-spire_correl_x.min())))
-SpireCorrelUnc = scipy.interpolate.interp1d(spire_correl_x, spire_correl_y, bounds_error='fill', fill_value=-np.inf)
 
 # Add correlated uncertainty information to band dataframe
 correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
@@ -89,7 +91,7 @@ for g in cat_frame.index:
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
-                            mcmc_n_walkers = 50,
-                            mcmc_n_steps = 500,
+                            mcmc_n_walkers = 20,
+                            mcmc_n_steps = 5000,
                             plot = 'Output/')
 
