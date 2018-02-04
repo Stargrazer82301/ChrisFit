@@ -17,7 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import KernelDensity
-from progress.bar import IncrementalBar
+import progress.bar
 import joblib
 import corner
 import emcee
@@ -143,15 +143,14 @@ def Fit(gal_dict,
         mcmc_initial = [(mle_params + (5E-1 * mle_params * np.random.randn(len(mle_params))) + (1E-3 * np.random.randn(len(mle_params)))) for i in range(mcmc_n_walkers)]
 
         # Initiate and run emcee affine-invariant ensemble sampler
-        mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.25)))
-        mcmc_bar = IncrementalBar('Sampling posterior with emcee', max=mcmc_n_steps, suffix='%(percent)d%% [%(elapsed_td)s / %(eta_td)s]')
-        for i, result in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
+        mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.2)))
+        mcmc_bar = progress.bar.Bar('Running MCMC', max=mcmc_n_steps, fill='=', suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
+        for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
             mcmc_bar.next()
         mcmc_bar.finish()
         #mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
         #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
-        pdb.set_trace()
 
         # Examine and plot autocorrelation of MCMC chains, to identify burn-in
         """autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
