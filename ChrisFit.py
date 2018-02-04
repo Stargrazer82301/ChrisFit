@@ -175,8 +175,9 @@ def Fit(gal_dict,
         mcmc_samples = mcmc_chains[:, mcmc_n_burn:, :].reshape((-1, n_params))
         #dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
 
-        # Find Maximum A Posteriori Estimate (MAPE)
+        # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
         mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        median_params = np.median(mcmc_samples, axis=0)
 
         # Plot posterior corner plot
         corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
@@ -188,7 +189,7 @@ def Fit(gal_dict,
                     corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
         # Plot median SED
-        sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
+        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
