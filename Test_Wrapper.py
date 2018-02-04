@@ -2,7 +2,7 @@
 import pdb
 import os
 import copy
-import random
+import time
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
@@ -54,11 +54,10 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 settings_dict = {'plotting':True}
 
 # List target galaxies
-target_gals = ['NGC4030''NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
-random.shuffle(target_gals)
+target_gals = ['NGC4030','NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
 
 # Loop over galaxies
-for g in cat_frame.index:
+for g in np.random.permutation(cat_frame.index):
     cat_frame_gal = cat_frame.loc[g]
     if cat_frame_gal['name'] not in target_gals:
         continue

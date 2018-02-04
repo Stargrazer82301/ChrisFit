@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.neighbors import KernelDensity
 import progress.bar
+import termcolor
 import joblib
 import corner
 import emcee
@@ -92,6 +93,14 @@ def Fit(gal_dict,
             """
 
 
+        # State name of source being procesed
+        if sys.stdout.isatty():
+            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']'))), 'green')
+        else:
+            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']')))
+        if verbose:
+            print(name_bracket_prefix  + 'Commencing processing')
+
         # Add column to bands_frame, to record which fluxes are larger than their uncertainty
         bands_frame['det'] = bands_frame.loc[:,'flux'] > bands_frame.loc[:,'error']
 
@@ -131,6 +140,8 @@ def Fit(gal_dict,
         mle_initial = MaxLikeInitial(mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         # Find Maximum Likelihood Estimate (MLE)
+        if verbose:
+            print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
         #mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_initial, minimizer_kwargs={'args':(mle_fit_dict)})
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='powell', tol=1E-5)
@@ -144,15 +155,22 @@ def Fit(gal_dict,
 
         # Initiate and run emcee affine-invariant ensemble sampler
         mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.2)))
-        mcmc_bar = progress.bar.Bar('Running MCMC', max=mcmc_n_steps, fill='=', suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
-        for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
-            mcmc_bar.next()
-        mcmc_bar.finish()
-        #mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
+        if verbose:
+            print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
+            mcmc_bar = progress.bar.Bar('Computing MCMC',
+                                        max=mcmc_n_steps,
+                                        fill='=',
+                                        suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
+            for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
+                mcmc_bar.next()
+        else:
+            mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
         #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
         # Examine and plot autocorrelation of MCMC chains, to identify burn-in
+        if verbose:
+            print(name_bracket_prefix + 'Evaluating MCMC autocorrelation to determine burn-in')
         """autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
         if plot == True:
             autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
@@ -162,15 +180,6 @@ def Fit(gal_dict,
                     autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
         mcmc_n_burn = int(0.2 * mcmc_n_steps)
 
-        # Plot trace of MCMC chains
-        """trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_n_burn, fit_dict)
-        if plot == True:
-            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
-
         # Combine MCMC chains into final posteriors for each parameter
         mcmc_samples = mcmc_chains[:, mcmc_n_burn:, :].reshape((-1, n_params))
         #dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
@@ -179,23 +188,37 @@ def Fit(gal_dict,
         mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
         median_params = np.median(mcmc_samples, axis=0)
 
-        # Plot posterior corner plot
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
-        if plot == True:
-            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
+        # If requested, commence plotting
+        if plot:
+            if verbose:
+                print(name_bracket + (' '*(15-len(name_bracket))) + 'Generating plots of results')
 
-        # Plot median SED
-        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
-        if plot == True:
-            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
+            # Plot trace of MCMC chains
+            """trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_n_burn, fit_dict)
+            if plot == True:
+                trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
+
+            # Plot posterior corner plot
+            corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
+            if plot == True:
+                corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
+
+            # Plot median SED
+            sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
+            if plot == True:
+                sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
 
 
 
@@ -943,13 +966,16 @@ def CornerPlot(mcmc_samples, mle, fit_dict):
             mle[i] = np.log10(mle[i])
 
     # Plot posterior corner diagrams (with histograms hidden)
-    fig = corner.corner(mcmc_samples,
-                        labels=labels,
-                        quantiles=[0.16,0.5,0.84],
-                        range=[0.99999]*len(labels),
-                        show_titles=True,
-                        truths=mle,
-                        hist_kwargs={'edgecolor':'none'})
+    try:
+        fig = corner.corner(mcmc_samples,
+                            labels=labels,
+                            quantiles=[0.16,0.5,0.84],
+                            range=[0.99999]*len(labels),
+                            show_titles=True,
+                            truths=mle,
+                            hist_kwargs={'edgecolor':'none'})
+    except:
+        pdb.set_trace()
 
     # Loop over variables and subplots, finding histogram subplot corresponding to each variable
     for i in range(len(labels)):
