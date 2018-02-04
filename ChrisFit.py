@@ -250,6 +250,12 @@ def LnLike(params, fit_dict):
             if band_flux_pred < bands_frame.loc[b,'flux']:
                 band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
 
+        # If temperatures of components aren't in 'order', return -inf ln-likelihood
+        for i in range(1, fit_dict['components']):
+            if temp_vector[i] < temp_vector[i-1]:
+                band_ln_like = -np.inf
+                break
+
         # Record ln-likelihood for this band
         ln_like.append(band_ln_like)
 

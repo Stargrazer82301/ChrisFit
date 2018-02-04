@@ -2,12 +2,15 @@
 import pdb
 import os
 import copy
+import random
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
 import scipy.stats
 import scipy.ndimage
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import ChrisFuncs
 import ChrisFit
@@ -42,7 +45,6 @@ def SpireCorrelUnc(prop, unc=0.04):
         y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
         return y[(np.abs(x-prop)).argmin()]
 
-
 # Add correlated uncertainty information to band dataframe
 correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
                'correl_scale':0.04,
@@ -53,6 +55,7 @@ settings_dict = {'plotting':True}
 
 # List target galaxies
 target_gals = ['NGC4030''NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
+random.shuffle(target_gals)
 
 # Loop over galaxies
 for g in cat_frame.index:
@@ -91,7 +94,7 @@ for g in cat_frame.index:
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
-                            mcmc_n_walkers = 20,
-                            mcmc_n_steps = 5000,
+                            mcmc_n_walkers = 50,
+                            mcmc_n_steps = 10000,
                             plot = 'Output/')
 
