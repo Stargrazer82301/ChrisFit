@@ -140,7 +140,7 @@ def Fit(gal_dict,
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
         # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
-        mcmc_initial = [(mle_params + (1E-1 * mle_params * np.random.randn(len(mle_params))) + (1E-3 * np.random.randn(len(mle_params)))) for i in range(mcmc_n_walkers)]
+        mcmc_initial = [(mle_params + (5E-1 * mle_params * np.random.randn(len(mle_params))) + (1E-3 * np.random.randn(len(mle_params)))) for i in range(mcmc_n_walkers)]
 
         # Initiate and run emcee affine-invariant ensemble sampler
         mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.25)))
