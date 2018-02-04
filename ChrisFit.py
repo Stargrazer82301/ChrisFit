@@ -125,6 +125,8 @@ def Fit(gal_dict,
                     'correl_unc':correl_unc,
                     'bounds':False,
                     'priors':priors,
+                    'mcmc_n_walkers':mcmc_n_walkers,
+                    'mcmc_n_steps':mcmc_n_steps,
                     'distance':gal_dict['distance'],
                     'kappa_0':kappa_0,
                     'kappa_0_lambda':kappa_0_lambda}
@@ -151,7 +153,7 @@ def Fit(gal_dict,
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
         # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
-        mcmc_initial = [(mle_params + (5E-1 * mle_params * np.random.randn(len(mle_params))) + (1E-3 * np.random.randn(len(mle_params)))) for i in range(mcmc_n_walkers)]
+        mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
         mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.2)))
@@ -163,6 +165,7 @@ def Fit(gal_dict,
                                         suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
             for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
                 mcmc_bar.next()
+            mcmc_bar.finish()
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
@@ -191,7 +194,7 @@ def Fit(gal_dict,
         # If requested, commence plotting
         if plot:
             if verbose:
-                print(name_bracket + (' '*(15-len(name_bracket))) + 'Generating plots of results')
+                print(name_bracket_prefix + 'Generating plots of results')
 
             # Plot trace of MCMC chains
             """trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_n_burn, fit_dict)
@@ -582,6 +585,49 @@ def MaxLikeInitial(fit_dict):
 
     # Return tuple of guesses
     return tuple(guess)
+
+
+
+
+
+def MCMCInitial(mle_params, fit_dict):
+    """ Function to generate initial positions for MCMC walkers, in cluster around maximum likelihood estimate """
+
+    # Loop over walkers
+    mcmc_initial = []
+    for i in range(fit_dict['mcmc_n_walkers']):
+
+        # Keep generating proposed starting positions until one is accepted
+        accepted = False
+        while not accepted:
+            accepted = True
+            walker_scale = 5E-1 * mle_params * np.random.randn(len(mle_params))
+            walker_offset = 1E-3 * np.random.randn(len(mle_params))
+            walker_initial = (mle_params + walker_scale + walker_offset)
+
+            # Check that temperature terms are in order
+            temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(walker_initial, fit_dict)
+            for i in range(1, fit_dict['components']):
+                if temp_vector[i] < temp_vector[i-1]:
+                    accepted = False
+
+            # Check that temperature terms are all physical (ie, temp > 0 kelvin)
+            if np.where(np.array(temp_vector)<=0)[0].size > 0:
+                accepted = False
+
+            # Check that mass terms are all physical (ie, mass > 0 Msol)
+            if np.where(np.array(mass_vector)<0)[0].size > 0:
+                accepted = False
+
+            # Check that beta terms are all physical (ie, beta > 0)
+            if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
+                accepted = False
+
+        # If proposed position is valid, add it to list of initial conditions
+        mcmc_initial.append(walker_initial)
+
+    # Return generated initial positions
+    return mcmc_initial
 
 
 
