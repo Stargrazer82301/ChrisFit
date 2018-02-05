@@ -146,7 +146,7 @@ def Fit(gal_dict,
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
         #mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_initial, minimizer_kwargs={'args':(mle_fit_dict)})
-        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='powell', tol=1E-5)
+        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5)#, options={'maxiter':int(n_params*100)})
         mle_params = mle_opt.x
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
@@ -238,52 +238,45 @@ def LnLike(params, fit_dict):
     # Programatically extract dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
     temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
+    # If temperatures of components aren't in 'order', return -inf ln-likelihood
+    for i in range(1, fit_dict['components']):
+        if temp_vector[i] < temp_vector[i-1]:
+            return -np.inf
+
     # Extract bands_frame from fit_dict
     bands_frame = fit_dict['bands_frame']
 
-    # Loop over fluxes, to calculate the ln-likelihood of each, given the proposed model
-    ln_like = []
-    for b in bands_frame.index.values:
+    # Calculate predicted fluxes for each band, given SED parameters
+    bands_flux_pred = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
+                                kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
 
-        # Skip this band if flux or uncertainty are nan
-        if True in np.isnan([bands_frame.loc[b,'error'],bands_frame.loc[b,'flux']]):
-            continue
+    # Caclculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
+    bands_instr = [band.split('_')[0] for band in bands_frame['band']]
+    bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_instr, temp_vector, mass_vector, beta_vector,
+                                      kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
+    bands_flux_pred *= bands_col_correct[0]
 
-        # Calculate predicted flux, given SED parameters
-        band_flux_pred = ModelFlux(bands_frame.loc[b,'wavelength'], temp_vector, mass_vector, fit_dict['distance'],
-                                   kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
-
-        # Update predicted flux value, to factor in colour correction (do this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
-        col_correct_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
-                                           temp_vector, mass_vector, beta_vector,
-                                           kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
-        band_flux_pred *= col_correct_factor[0]
-
-        # If there is a correlated uncertainty term, reduce the flux uncertainty to its uncorrelated (non-systematic) component, and update predicted flux
-        band_unc = bands_frame.loc[b,'error']
-        if len(correl_err_vector) > 0:
+    # If there are correlated uncertainty terms, reduce the flux uncertainties to uncorrelated (non-systematic) components, and update predicted fluxes
+    bands_unc =  bands_frame['error'].values.copy()
+    if len(correl_err_vector) > 0:
+        for j in range(len(bands_frame)):
+            b = bands_frame.index.values[j]
             for i in range(len(fit_dict['correl_unc'])):
                 correl_param = fit_dict['correl_unc'][i]
                 if bands_frame.loc[b,'band'] in correl_param['correl_bands']:
-                    band_unc = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
-                    band_flux_pred *= 1 + correl_err_vector[i]
+                    bands_unc[i] = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
+                    bands_flux_pred[j] *= 1 + correl_err_vector[i]
 
-        # Calculate ln-likelihood of flux, given measurement uncertainties and proposed model
-        band_ln_like = np.log(scipy.stats.norm.pdf(band_flux_pred, loc=bands_frame.loc[b,'flux'], scale=band_unc))
+    # Calculate ln-likelihood of each flux, given measurement uncertainties and proposed model
+    ln_like = np.log(scipy.stats.norm.pdf(bands_flux_pred, loc=bands_frame['flux'], scale=bands_unc))
 
-        # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
-        if bands_frame.loc[b,'limit']:
-            if band_flux_pred < bands_frame.loc[b,'flux']:
-                band_ln_like = np.log(scipy.stats.norm.pdf(bands_frame.loc[b,'flux'], loc=bands_frame.loc[b,'flux'], scale=band_unc))
+    # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assinged same ln-likelihood as if predicted flux == observed flux
+    ln_like[np.where(bands_frame['limit'].values)] = np.log(scipy.stats.norm.pdf(bands_frame['flux'],
+                                                                                 loc=bands_frame['flux'],
+                                                                                 scale=bands_unc))[np.where(bands_frame['limit'].values)]
 
-        # If temperatures of components aren't in 'order', return -inf ln-likelihood
-        for i in range(1, fit_dict['components']):
-            if temp_vector[i] < temp_vector[i-1]:
-                band_ln_like = -np.inf
-                break
-
-        # Record ln-likelihood for this band
-        ln_like.append(band_ln_like)
+    # Exclude the calculated ln-likelihood for bands where flux and/or uncertainty are nan
+    ln_like = ln_like[np.where((np.isnan(bands_frame['flux']) == False) & (np.isnan(bands_frame['error']) == False))]
 
     # Calculate and return final data ln-likelihood
     ln_like = np.sum(np.array(ln_like))
