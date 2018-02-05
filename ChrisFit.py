@@ -733,45 +733,61 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
     old_cwd = os.getcwd()
     os.chdir(str(os.path.dirname(os.path.realpath(sys.argv[0]))))
 
-    # Identify instrument and wavelength, and read in corresponding colour-correction data
-    unknown = False
-    try:
+    # Loop over bands (if only one band has been submitted, stick it in a list to enable looping)
+    factor_result, index_result = [], []
+    if not hasattr(wavelength, '__iter__'):
+        single = True
+        wavelength, instrument = [wavelength], [instrument]
+    else:
+        single = False
+    for b in range(len(wavelength)):
+
+        # Identify instrument and wavelength, and read in corresponding colour-correction data
+        unknown = False
         try:
-            data_table = np.genfromtxt('Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
+            try:
+                data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
+            except:
+                data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
+            data_index = data_table['alpha']
+            data_column = 'K'+str(int(wavelength[b]*1E6))
+            data_factor = data_table[data_column]
         except:
-            data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument+'.csv'), delimiter=',', names=True)
-        data_index = data_table['alpha']
-        data_column = 'K'+str(int(wavelength*1E6))
-        data_factor = data_table[data_column]
-    except:
-        unknown = True
-        if verbose == True:
-            print(' ')
-            print('Instrument \''+instrument+'\' not recognised, no colour correction applied.')
+            unknown = True
+            if verbose == True:
+                print(' ')
+                print('Instrument \''+instrument[b]+'\' not recognised, no colour correction applied.')
 
-    # If instrument successfully identified, perform colour correction; otherwise, cease
-    if unknown==True:
-        factor = 1.0
-        index = np.NaN
-    elif unknown==False:
+        # If instrument successfully identified, perform colour correction; otherwise, cease
+        if unknown==True:
+            factor = 1.0
+            index = np.NaN
+        elif unknown==False:
 
-        # Calculate relative flux at wavelengths at points at wavelengths 1% to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
-        lambda_plus = wavelength*1.01
-        lambda_minus = wavelength*0.99
-        flux_plus = ModelFlux(lambda_plus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
-        flux_minus = ModelFlux(lambda_minus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
+            # Calculate relative flux at wavelengths at points at wavelengths 1% to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
+            lambda_plus = wavelength[b]*1.01
+            lambda_minus = wavelength[b]*0.99
+            flux_plus = ModelFlux(lambda_plus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
+            flux_minus = ModelFlux(lambda_minus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
 
-        # Determine spectral index (remembering to convert to frequency space)
-        index = ( np.log10(flux_plus) - np.log10(flux_minus) ) / ( np.log10(lambda_plus) - np.log10(lambda_minus) )
-        index= -1.0 * index
+            # Determine spectral index (remembering to convert to frequency space)
+            index = ( np.log10(flux_plus) - np.log10(flux_minus) ) / ( np.log10(lambda_plus) - np.log10(lambda_minus) )
+            index= -1.0 * index
 
-        # Use cubic spline interpolation to estimate colour-correction divisor at calculated spectral index
-        interp = scipy.interpolate.interp1d(data_index, data_factor, kind='linear', bounds_error=None, fill_value='extrapolate')
-        factor = interp(index)[0]
+            # Use cubic spline interpolation to estimate colour-correction divisor at calculated spectral index
+            interp = scipy.interpolate.interp1d(data_index, data_factor, kind='linear', bounds_error=None, fill_value='extrapolate')
+            factor = interp(index)[0]
 
-    # Restore old cwd, and return results
+        # Append results to output lists
+        factor_result.append(factor)
+        index_result.append(factor)
+
+    # Restore old cwd, and return results (grabbing single values if only one band is being processed)
     os.chdir(old_cwd)
-    return factor, index
+    if single:
+        return factor_result[0], index_result[0]
+    else:
+        return np.array(factor_result), np.array(index_result)
 
 
 
