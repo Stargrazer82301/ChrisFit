@@ -555,7 +555,7 @@ def MaxLikeInitial(fit_dict):
     guess = []
 
     # Temperature guesses for 18K if one MBB; 18K and 50K if two MBB; equally spaced therebetween for 3 or more
-    temp_guess = np.linspace(18.0, 100.0, num=fit_dict['components'])
+    temp_guess = np.linspace(18.0, 40.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
@@ -598,8 +598,10 @@ def MCMCInitial(mle_params, fit_dict):
         accepted = False
         while not accepted:
             accepted = True
-            walker_scale = 1E-1 * mle_params * np.random.randn(len(mle_params))
-            walker_offset = 1E-3 * np.random.randn(len(mle_params))
+			
+			# Permutate walker initial positions by +/- 20%, with additional +/- 0.001 random shift
+            walker_scale = 0.2 * mle_params * np.random.rand(len(mle_params))
+            walker_offset = 1E-3 * np.random.rand(len(mle_params))
             walker_initial = (mle_params + walker_scale + walker_offset)
 
             # Check that temperature terms are in order
@@ -672,7 +674,7 @@ def PriorsConstruct(fit_dict):
         beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3, loc=0, scale=1))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
-    # Return comleted priors dictionary
+    # Return completed priors dictionary
     return priors
 
 
