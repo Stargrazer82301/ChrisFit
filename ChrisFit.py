@@ -156,7 +156,7 @@ def Fit(gal_dict,
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
-        mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.2)))
+        mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.0)))
         if verbose:
             print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
             mcmc_bar = progress.bar.Bar('Computing MCMC',
@@ -601,7 +601,7 @@ def MCMCInitial(mle_params, fit_dict):
         accepted = False
         while not accepted:
             accepted = True
-            walker_scale = 5E-1 * mle_params * np.random.randn(len(mle_params))
+            walker_scale = 1E-1 * mle_params * np.random.randn(len(mle_params))
             walker_offset = 1E-3 * np.random.randn(len(mle_params))
             walker_initial = (mle_params + walker_scale + walker_offset)
 
@@ -993,7 +993,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
 
 
-def CornerPlot(mcmc_samples, mle, fit_dict):
+def CornerPlot(mcmc_samples, params_highlight, fit_dict):
     """ Function to produce corner plot of posterior distribution, replacing histograms with KDEs, and with the maximum
     likelihood solution shown """
 
@@ -1009,16 +1009,16 @@ def CornerPlot(mcmc_samples, mle, fit_dict):
     for i in range(len(labels)):
         if labels[i][:2] == '$M':
             mcmc_samples[:,i] = np.log10(mcmc_samples[:,i])
-            mle[i] = np.log10(mle[i])
+            params_highlight[i] = np.log10(params_highlight[i])
 
     # Plot posterior corner diagrams (with histograms hidden)
     try:
         fig = corner.corner(mcmc_samples,
                             labels=labels,
                             quantiles=[0.16,0.5,0.84],
-                            range=[0.99999]*len(labels),
+                            #range=[0.99999]*len(labels),
                             show_titles=True,
-                            truths=mle,
+                            truths=params_highlight,
                             hist_kwargs={'edgecolor':'none'})
     except:
         pdb.set_trace()
