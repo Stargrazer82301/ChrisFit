@@ -95,7 +95,7 @@ def Fit(gal_dict,
 
         # State name of source being procesed
         if sys.stdout.isatty():
-            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']'))), 'green')
+            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
         else:
             name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']')))
         if verbose:
@@ -222,6 +222,10 @@ def Fit(gal_dict,
                 if isinstance(plot, str):
                     if os.path.exists(plot):
                         sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
+
+        # Return results
+        if verbose:
+            print(name_bracket_prefix + 'Processing completed')
 
 
 
