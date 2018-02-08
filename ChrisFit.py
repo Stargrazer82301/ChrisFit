@@ -53,43 +53,55 @@ def Fit(gal_dict,
         Function that runs the ChrisFit dust SED fitting routine.
 
         Arguments:
-            gal_dict:           A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
-                                values for the target source in  question
-            bands_frame:        A dataframe, with columns called 'band', 'flux', and 'error', providing the relevant
-                                values for each band for the target source in question
+            gal_dict:
+                    A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
+                    values for the target source in  question
+            bands_frame:
+                    A dataframe, with columns called 'band', 'flux', and 'error', providing the relevant
+                    values for each band for the target source in question
 
         Keyword arguments:
-            beta_vary:          A boolean, stating whether or not beta (the emissivity slope) should a free parameter,
-                                or fixed
-            beta:               A float, or list of floats, stating the value(s) of beta to use. If only a single float
-                                is given, this is used for all components. If beta_vary is set to true, beta will
-                                provide starting position for MCMC
-            components:         An integer, stating how many modified blackbody components should make up the model
-                                being fit
-            kappa_0:            The value of the dust mass absorption coefficient, kappa_d, to use to calculate dust mass
-                                (uses Clark et al., 2016, value by default)
-            kappa_0_lambda:     The reference wavelength for kappa_0; corresponding value of kappa_0 at other
-                                wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
-            plot:               A boolean, stating whether to generate plots of the resulting SED fit; or,
-                                alternatively, a string pointing to the desired plotting output directory
-            correl_unc:          A list, each element of which (if any) is a dictionary describing band-covariant
-                                uncertainties; for the 5% Hershcel-SPIRE band covariance, correl_unc would be:
-                                [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
-                                'correl_scale':0.04,
-                                'correl_distr':'flat'}],
-                                where 'bands' describes the bands (as named in bands_frame) in question, 'correl_scale'
-                                describes the size of the covariant component of the flux uncertainty (as a fraction of
-                                measured source flux), and 'correl_distr' is the assumed distribution of the uncertainty
-                                (currently accepting either 'flat', 'normal', or a defined function)
-            priors:             A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
-                                'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
-                                components, with the n-th list element being a function giving the ln-like prior for the
-                                parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
-                                that the priors for any correlated uncertainty terms should be provided through the
-                                correl_unc kwarg instead
-            full_posterior:     A boolean, stating whether the full posterior distribution of each parameter should be
-                                returned, or just the summary of median, credible interval, etc
-            verbose:            A boolean, stating whether ChrisFit should provide verbose output whilst operating
+            beta_vary:
+                    A boolean, stating whether or not beta (the emissivity slope) should a free parameter,
+                    or fixed
+            beta:
+                    A float, or list of floats, stating the value(s) of beta to use. If only a single float
+                    is given, this is used for all components. If beta_vary is set to true, beta will
+                    provide starting position for MCMC
+            components:
+                    An integer, stating how many modified blackbody components should make up the model
+                    being fit
+            kappa_0:
+                    The value of the dust mass absorption coefficient, kappa_d, to use to calculate dust mass
+                    (uses Clark et al., 2016, value by default)
+            kappa_0_lambda:
+                    The reference wavelength for kappa_0; corresponding value of kappa_0 at other
+                    wavelengths extrapolated via (kappa_0_lambda/lambda)**beta
+            plot:
+                    A boolean, stating whether to generate plots of the resulting SED fit; or,
+                    alternatively, a string pointing to the desired plotting output directory
+            correl_unc:
+                    A list, each element of which (if any) is a dictionary describing band-covariant
+                    uncertainties; for the 5% Hershcel-SPIRE band covariance, correl_unc would be:
+                    [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
+                    'correl_scale':0.04,
+                    'correl_distr':'flat'}],
+                    where 'bands' describes the bands (as named in bands_frame) in question, 'correl_scale'
+                    describes the size of the covariant component of the flux uncertainty (as a fraction of
+                    measured source flux), and 'correl_distr' is the assumed distribution of the uncertainty
+                    (currently accepting either 'flat', 'normal', or a defined function)
+            priors:
+                    A dictionary, of lists, of functions (yeah, I know); dictionary entries can be called
+                    'temp', 'mass', and 'beta', each entry being an n-length list, where n is the number of
+                    components, with the n-th list element being a function giving the ln-like prior for the
+                    parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
+                    that the priors for any correlated uncertainty terms should be provided through the
+                    correl_unc kwarg instead
+            full_posterior:
+                    A boolean, stating whether the full posterior distribution of each parameter should be
+                    returned, or just the summary of median, credible interval, etc
+            verbose:
+                    A boolean, stating whether ChrisFit should provide verbose output whilst operating
             """
 
 
