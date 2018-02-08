@@ -569,7 +569,7 @@ def MaxLikeInitial(fit_dict):
     guess = []
 
     # Temperature guesses for 18K if one MBB; 18K and 50K if two MBB; equally spaced therebetween for 3 or more
-    temp_guess = np.linspace(18.0, 40.0, num=fit_dict['components'])
+    temp_guess = np.linspace(20.0, 55.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
@@ -581,7 +581,7 @@ def MaxLikeInitial(fit_dict):
     # Mass guesses are based on empirical relation, then scale for kappa
     mass_guess = np.array([peak_mass] * fit_dict['components'])
     mass_guess *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
-    mass_guess *= 10**((temp_guess-temp_guess[0])/-15)
+    mass_guess *= 10**((temp_guess-temp_guess[0])/-20)
     guess += mass_guess.tolist()
 
     # Beta is always guessed to have a value of 2
@@ -612,7 +612,7 @@ def MCMCInitial(mle_params, fit_dict):
         accepted = False
         while not accepted:
             accepted = True
-			
+
 			# Permutate walker initial positions by +/- 20%, with additional +/- 0.001 random shift
             walker_scale = 0.2 * mle_params * np.random.rand(len(mle_params))
             walker_offset = 1E-3 * np.random.rand(len(mle_params))
@@ -660,7 +660,7 @@ def PriorsConstruct(fit_dict):
 
     # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
     temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
-    temp_mode = np.linspace(18.0, 40.0, num=fit_dict['components'])
+    temp_mode = np.linspace(20.0, 55.0, num=fit_dict['components'])
     temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
     for i in range(fit_dict['components']):
         temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
@@ -678,7 +678,7 @@ def PriorsConstruct(fit_dict):
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_mode *= 10**((temp_mode-temp_mode[0])/-20)
     mass_mode = np.log10(mass_mode)
-    mass_sigma = np.array([3.0] * fit_dict['components'])
+    mass_sigma = np.array([5.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
         mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
         priors['mass'].append(mass_ln_like)
