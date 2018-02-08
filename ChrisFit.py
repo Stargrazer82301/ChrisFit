@@ -157,9 +157,10 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
-        #mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_initial, minimizer_kwargs={'args':(mle_fit_dict)})
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5)#, options={'maxiter':int(n_params*100)})
+        mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_opt.x, niter=10, T=10.0, minimizer_kwargs={'args':(mle_fit_dict)})
         mle_params = mle_opt.x
+        mape_params = mle_params.copy()
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
