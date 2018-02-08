@@ -160,12 +160,12 @@ def Fit(gal_dict,
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5)#, options={'maxiter':int(n_params*100)})
         mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_opt.x, niter=10, T=10.0, minimizer_kwargs={'args':(mle_fit_dict)})
         mle_params = mle_opt.x
-        mape_params = mle_params.copy()
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+        mape_params = mle_params.copy()
 
-        # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
+        """# Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
@@ -182,26 +182,32 @@ def Fit(gal_dict,
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
-        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
-        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))"""
+        mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
         # Examine and plot autocorrelation of MCMC chains, to identify burn-in
         if verbose:
             print(name_bracket_prefix + 'Evaluating MCMC autocorrelation to determine burn-in')
-        autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
+        autocorr_fig, autocorr_ax, mcmc_burn = Autocorr(mcmc_chains, fit_dict)
         if plot == True:
             autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
         elif plot != False:
             if isinstance(plot, str):
                 if os.path.exists(plot):
-                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
-        mcmc_n_burn = int(0.25 * mcmc_n_steps)
+                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Autocorrelation.png'), dpi=150)
+
+        # Remove burnin from chains
+        mcmc_burn = 3.0 * np.max(mcmc_burn, axis=0)
+        mcmc_chains_burn = mcmc_chains.copy()
+        for i in range(mcmc_chains.shape[0]):
+            mcmc_chains_burn[i, :min(int(mcmc_burn[i]),mcmc_chains.shape[1]), :] = np.nan
 
         # Combine MCMC chains into final posteriors for each parameter
-        mcmc_samples = mcmc_chains[:, mcmc_n_burn:, :].reshape((-1, n_params))
+        mcmc_samples = mcmc_chains_burn.reshape((-1, n_params))
+        mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
 
-        # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        """# Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
+        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]"""
         median_params = np.median(mcmc_samples, axis=0)
 
         # If requested, commence plotting
@@ -209,8 +215,8 @@ def Fit(gal_dict,
             if verbose:
                 print(name_bracket_prefix + 'Generating plots of results')
 
-            # Plot trace of MCMC chains
-            """trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_n_burn, fit_dict)
+            """# Plot trace of MCMC chains
+            trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_burn, fit_dict)
             if plot == True:
                 trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
             elif plot != False:
@@ -1088,7 +1094,7 @@ def Autocorr(mcmc_chains, fit_dict):
     # Define colour palettes to use for different parameters (up to three components)
     temp_palettes = ['PuBu', 'PuBuGn', 'PuGn']
     mass_palettes = ['BuPu', 'PuRd', 'RdPu']
-    beta_palettes = ['GnBu', 'YlGnGn', 'PuGn']
+    beta_palettes = ['GnBu', 'YlGnBu', 'YlGn']
     correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
 
     # Create dummy parameter vectors, just to find out how many parameters there are
@@ -1097,35 +1103,51 @@ def Autocorr(mcmc_chains, fit_dict):
     # Assign colour palettes to components, and bundle into combined palettes list
     temp_palettes = np.repeat(temp_palettes, int(np.ceil(float(len(temp_vector))/float(len(temp_palettes))))).tolist()[:len(temp_vector)]
     mass_palettes = np.repeat(mass_palettes, int(np.ceil(float(len(mass_vector))/float(len(mass_palettes))))).tolist()[:len(mass_vector)]
-    beta_palettes = np.repeat(beta_palettes, int(np.ceil(float(len(beta_vector))/float(len(beta_palettes))))).tolist()[:len(beta_vector)]
+    beta_palettes = np.repeat(beta_palettes, int(np.ceil(float(len(fit_dict['beta']))/float(len(beta_palettes))))).tolist()[:len(fit_dict['beta'])]
     correl_err_palettes = np.repeat(correl_err_palettes, int(np.ceil(float(len(correl_err_vector))/float(len(correl_err_palettes))))).tolist()[:len(correl_err_vector)]
     palettes = temp_palettes + mass_palettes + beta_palettes + correl_err_palettes
 
     # Generate figure, with subplot for each parameter
     labels = ParamsLabel(fit_dict)
-    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(6,(2*fit_dict['n_params'])))
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(20,(3*fit_dict['n_params'])))
 
-    # Loop over parameters and walkers
+    # Initiate record-keeping variables, and loop over parameters, then loop over chains
+    autocorr_xlim = int(0.8*mcmc_chains.shape[1])
+    burnin = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
-            # Compute and plot autocorrelation function for each chain
+            # Compute autocorrelation function and time and burn-in for chain
             autocorr_func = acor.function(mcmc_chains[j, :, i])
+            #autocorr_time = acor.acor(mcmc_chains[j, :, i])
+            burnin[i,j] = np.where(autocorr_func < 0)[0].min()
+
+            # Plot autocorrelation function and burn-in
             palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
-            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func, color=palette[j], alpha=0.5)
+            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func, color=palette[j], alpha=0.65)
+            ax[i].plot([burnin[i,j],burnin[i,j]], [1E5,-1E5], c=palette[j], ls=':')
 
         # Format axis
-        ax[i].set_xscale('log')
-        ax[i].set_xlabel(labels[i]+' Step')
-        ax[i].set_ylabel('Autocorrelation')
+        ax[i].set_xlim(0, autocorr_xlim)
+        ax[i].set_ylim(-0.5, 1)
+        ax[i].set_xlabel('Step')
+        ax[i].set_ylabel(labels[i]+' Autocorrelation')
+
+    # Plot burnin time on axes
+    for i in range(mcmc_chains.shape[2]):
+        ax[i].plot([burnin[i].max(),burnin[i].max()], [1E5,-1E5], c='gray', ls=':', alpha=0.6)
 
     # Return final figure and axes objects
     fig.tight_layout()
-    fig.savefig(os.path.join('/home/herdata/spx7cjc/Dropbox/Work/Scripts/ChrisFit/Output/',fit_dict['gal_dict']['name']+'_Autocorrelation.png'), dpi=150)
-    pdb.set_trace()
-    return fig, ax
+    return fig, ax, burnin
 
 
 
 def TracePlot(mcmc_chains, mcmc_n_burn, fit_dict):
     """ Function to produce a trace plot showing the MCMC chains """
+
+    # Enable seaborn for easy, attractive plots
+    plt.ioff()
+    sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
+    sns.set_style('ticks')
+    palette = sns.color_palette('muted', n_colors=fit_dict['n_params'])

@@ -93,7 +93,7 @@ for g in np.random.permutation(cat_frame.index):
                             components = 2,
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
-                            mcmc_n_walkers = 20,
-                            mcmc_n_steps = 20000,
+                            mcmc_n_walkers = 12,
+                            mcmc_n_steps = 40000,#40000
                             plot = 'Output/')
 
