@@ -19,7 +19,7 @@ import seaborn as sns
 from sklearn.neighbors import KernelDensity
 import progress.bar
 import termcolor
-import joblib
+import acor
 import corner
 import emcee
 
@@ -181,23 +181,23 @@ def Fit(gal_dict,
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
+        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
         #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
         # Examine and plot autocorrelation of MCMC chains, to identify burn-in
         if verbose:
             print(name_bracket_prefix + 'Evaluating MCMC autocorrelation to determine burn-in')
-        """autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
+        autocorr_fig, autocorr_ax, mcmc_n_burn = Autocorr(mcmc_chains, fit_dict)
         if plot == True:
             autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
         elif plot != False:
             if isinstance(plot, str):
                 if os.path.exists(plot):
-                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
-        mcmc_n_burn = int(0.2 * mcmc_n_steps)
+                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
+        mcmc_n_burn = int(0.25 * mcmc_n_steps)
 
         # Combine MCMC chains into final posteriors for each parameter
         mcmc_samples = mcmc_chains[:, mcmc_n_burn:, :].reshape((-1, n_params))
-        #dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
 
         # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
         mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
@@ -1082,11 +1082,46 @@ def Autocorr(mcmc_chains, fit_dict):
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
     sns.set_style('ticks')
-    pallette = sns.color_palette('muted', n_colors=fit_dict['n_params'])
+
+    # Define colour palettes to use for different parameters (up to three components)
+    temp_palettes = ['PuBu', 'PuBuGn', 'PuGn']
+    mass_palettes = ['BuPu', 'PuRd', 'RdPu']
+    beta_palettes = ['GnBu', 'YlGnGn', 'PuGn']
+    correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
+
+    # Create dummy parameter vectors, just to find out how many parameters there are
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(mcmc_chains[0,0,:], fit_dict)
+
+    # Assign colour palettes to components, and bundle into combined palettes list
+    temp_palettes = np.repeat(temp_palettes, int(np.ceil(float(len(temp_vector))/float(len(temp_palettes))))).tolist()[:len(temp_vector)]
+    mass_palettes = np.repeat(mass_palettes, int(np.ceil(float(len(mass_vector))/float(len(mass_palettes))))).tolist()[:len(mass_vector)]
+    beta_palettes = np.repeat(beta_palettes, int(np.ceil(float(len(beta_vector))/float(len(beta_palettes))))).tolist()[:len(beta_vector)]
+    correl_err_palettes = np.repeat(correl_err_palettes, int(np.ceil(float(len(correl_err_vector))/float(len(correl_err_palettes))))).tolist()[:len(correl_err_vector)]
+    palettes = temp_palettes + mass_palettes + beta_palettes + correl_err_palettes
 
     # Generate figure, with subplot for each parameter
     labels = ParamsLabel(fit_dict)
-    fig, ax = plt.subplots(nrows=fit_dict['n_params'], ncols=1)
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(6,(2*fit_dict['n_params'])))
+
+    # Loop over parameters and walkers
+    for i in range(mcmc_chains.shape[2]):
+        for j in range(mcmc_chains.shape[0]):
+
+            # Compute and plot autocorrelation function for each chain
+            autocorr_func = acor.function(mcmc_chains[j, :, i])
+            palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
+            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func, color=palette[j], alpha=0.5)
+
+        # Format axis
+        ax[i].set_xscale('log')
+        ax[i].set_xlabel(labels[i]+' Step')
+        ax[i].set_ylabel('Autocorrelation')
+
+    # Return final figure and axes objects
+    fig.tight_layout()
+    fig.savefig(os.path.join('/home/herdata/spx7cjc/Dropbox/Work/Scripts/ChrisFit/Output/',fit_dict['gal_dict']['name']+'_Autocorrelation.png'), dpi=150)
+    pdb.set_trace()
+    return fig, ax
 
 
 
