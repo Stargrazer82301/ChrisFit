@@ -12,6 +12,7 @@ import numpy as np
 import scipy.stats
 import scipy.interpolate
 import scipy.optimize
+import scipy.ndimage
 import matplotlib
 #matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -165,7 +166,7 @@ def Fit(gal_dict,
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
         mape_params = mle_params.copy()
 
-        """# Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
+        # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
@@ -182,13 +183,13 @@ def Fit(gal_dict,
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
-        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))"""
-        mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
+        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
         # Examine and plot autocorrelation of MCMC chains, to identify burn-in
         if verbose:
-            print(name_bracket_prefix + 'Evaluating MCMC autocorrelation to determine burn-in')
-        autocorr_fig, autocorr_ax, mcmc_burn = Autocorr(mcmc_chains, fit_dict)
+            print(name_bracket_prefix + 'Evaluating MCMC autocorrelation')
+        autocorr_fig, autocorr_ax = Autocorr(mcmc_chains, fit_dict)
         if plot == True:
             autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
         elif plot != False:
@@ -197,17 +198,19 @@ def Fit(gal_dict,
                     autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Autocorrelation.png'), dpi=150)
 
         # Remove burnin from chains
-        mcmc_burn = 3.0 * np.max(mcmc_burn, axis=0)
+        mcmc_burn = np.max(mcmc_burn, axis=0)
         mcmc_chains_burn = mcmc_chains.copy()
+        mcmc_lnprob_burn = copy.deepcopy(mcmc_sampler._lnprob)
         for i in range(mcmc_chains.shape[0]):
-            mcmc_chains_burn[i, :min(int(mcmc_burn[i]),mcmc_chains.shape[1]), :] = np.nan
+            mcmc_chains_burn[i, :min(int(mcmc_burn[i]),mcmc_chains_burn.shape[1]), :] = np.nan
+            mcmc_lnprob_burn[i, :min(int(mcmc_burn[i]),mcmc_lnprob_burn.shape[1])] = np.nan
 
         # Combine MCMC chains into final posteriors for each parameter
         mcmc_samples = mcmc_chains_burn.reshape((-1, n_params))
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
 
-        """# Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]"""
+        # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
+        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
         median_params = np.median(mcmc_samples, axis=0)
 
         # If requested, commence plotting
@@ -1082,6 +1085,8 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
     return fig, ax
 
 
+	
+	
 
 def Autocorr(mcmc_chains, fit_dict):
     """ Function to analyse the autocorrelation of the MCMC chains to identify burnin """
@@ -1112,35 +1117,34 @@ def Autocorr(mcmc_chains, fit_dict):
     fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(12,(2*fit_dict['n_params'])))
 
     # Initiate record-keeping variables, and loop over parameters, then loop over chains    
-    burnin = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
+    autocorr_time = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
             # Compute autocorrelation function and time and burn-in for chain
             autocorr_func = acor.function(mcmc_chains[j, :, i])
-            autocorr_time = acor.acor(mcmc_chains[j, :, i])
-            burnin[i,j] = max(3.0*autocorr_time[0], 3.0*np.where(autocorr_func < 0)[0].min())
+            autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])
+            print('##### THIS ISN\'T HOW BURN-IN WORKS #####')
 
-            # Plot autocorrelation function and burn-in
+            # Plot autocorrelation function and autocorrelation time
             autocorr_func_conv = scipy.ndimage.filters.gaussian_filter(autocorr_func, 10)
             palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
-            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func_conv, color=palette[j], alpha=0.65)
-            ax[i].plot([burnin[i,j],burnin[i,j]], [1E5,-1E5], c=palette[j], ls=':')
+            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func_conv, color=palette[j], alpha=0.65, lw=1.0)
+            ax[i].plot([autocorr_time[i,j],autocorr_time[i,j]], [1E5,-1E5], c=palette[j], ls=':')
 
-        # Format axis
-        autocorr_xlim = min(int(4.0*burnin.max()), int(0.6*mcmc_chains.shape[1]))
-        ax[i].set_xlim(0, autocorr_xlim)
+        # Format axis        
         ax[i].set_ylim(-1, 1)        
-        ax[i].set_ylabel('${\it ACF(}$'+labels[i]+'${\it )}$')
+        ax[i].set_ylabel('${\it ACF\, (}$'+labels[i]+'${\it )}$')
 
-    # Plot burnin time on axes
+    # Plot autocorrelation time on axes, and format accordingly
+    autocorr_xlim = min(mcmc_chains.shape[1], 5000. * np.ceil((0.6*mcmc_chains.shape[1]) / 5000.)
     for i in range(mcmc_chains.shape[2]):
-        ax[i].plot([burnin[i].max(),burnin[i].max()], [1E5,-1E5], c='gray', ls=':', alpha=0.6)
+        ax[i].set_xlim(0, autocorr_xlim)
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('Step')
     fig.tight_layout()
-    return fig, ax, burnin
+    return fig, ax
 
 
 	
