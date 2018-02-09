@@ -50,11 +50,13 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
                'correl_scale':0.04,
                'correl_distr':SpireCorrelUnc}]
 
-# Initiate settings dictionary
-settings_dict = {'plotting':True}
+# State output directory
+out_dir = 'Output/'
 
-# List target galaxies
+# List target galaxies (skipping galaxies already processed)
 target_gals = ['NGC4030','NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
+processed_gals = set([processed_gal.split('_')[:-1][0] for processed_gal in os.listdir(out_dir)])
+target_gals = list(set(target_gals) - processed_gals)
 
 # Loop over galaxies
 for g in np.random.permutation(cat_frame.index):
@@ -94,6 +96,6 @@ for g in np.random.permutation(cat_frame.index):
                             kappa_0 = 0.051,
                             kappa_0_lambda = 500E-6,
                             mcmc_n_walkers = 12,
-                            mcmc_n_steps = 40000,#40000
-                            plot = 'Output/')
+                            mcmc_n_steps = 50000,
+                            plot = out_dir)
 
