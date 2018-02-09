@@ -1109,39 +1109,42 @@ def Autocorr(mcmc_chains, fit_dict):
 
     # Generate figure, with subplot for each parameter
     labels = ParamsLabel(fit_dict)
-    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(20,(3*fit_dict['n_params'])))
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(12,(2*fit_dict['n_params'])))
 
-    # Initiate record-keeping variables, and loop over parameters, then loop over chains
-    autocorr_xlim = int(0.8*mcmc_chains.shape[1])
+    # Initiate record-keeping variables, and loop over parameters, then loop over chains    
     burnin = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
             # Compute autocorrelation function and time and burn-in for chain
             autocorr_func = acor.function(mcmc_chains[j, :, i])
-            #autocorr_time = acor.acor(mcmc_chains[j, :, i])
-            burnin[i,j] = np.where(autocorr_func < 0)[0].min()
+            autocorr_time = acor.acor(mcmc_chains[j, :, i])
+            burnin[i,j] = max(3.0*autocorr_time[0], 3.0*np.where(autocorr_func < 0)[0].min())
 
             # Plot autocorrelation function and burn-in
+            autocorr_func_conv = scipy.ndimage.filters.gaussian_filter(autocorr_func, 10)
             palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
-            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func, color=palette[j], alpha=0.65)
+            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func_conv, color=palette[j], alpha=0.65)
             ax[i].plot([burnin[i,j],burnin[i,j]], [1E5,-1E5], c=palette[j], ls=':')
 
         # Format axis
+        autocorr_xlim = min(int(4.0*burnin.max()), int(0.6*mcmc_chains.shape[1]))
         ax[i].set_xlim(0, autocorr_xlim)
-        ax[i].set_ylim(-0.5, 1)
-        ax[i].set_xlabel('Step')
-        ax[i].set_ylabel(labels[i]+' Autocorrelation')
+        ax[i].set_ylim(-1, 1)        
+        ax[i].set_ylabel('${\it ACF(}$'+labels[i]+'${\it )}$')
 
     # Plot burnin time on axes
     for i in range(mcmc_chains.shape[2]):
         ax[i].plot([burnin[i].max(),burnin[i].max()], [1E5,-1E5], c='gray', ls=':', alpha=0.6)
 
-    # Return final figure and axes objects
+    # Perform final formatting, and return figure and axes objects
+    ax[-1:][0].set_xlabel('Step')
     fig.tight_layout()
     return fig, ax, burnin
 
 
+	
+	
 
 def TracePlot(mcmc_chains, mcmc_n_burn, fit_dict):
     """ Function to produce a trace plot showing the MCMC chains """
