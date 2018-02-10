@@ -16,6 +16,7 @@ import scipy.ndimage
 import matplotlib
 #matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import seaborn as sns
 from sklearn.neighbors import KernelDensity
 import progress.bar
@@ -106,7 +107,7 @@ def Fit(gal_dict,
             """
 
 
-        # State name of source being procesed
+        # State name of source being processed
         if sys.stdout.isatty():
             name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
         else:
@@ -186,7 +187,16 @@ def Fit(gal_dict,
         dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
         #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
-        # Examine and plot autocorrelation of MCMC chains, to identify burn-in
+        # Plot trace of MCMC chains
+        trace_fig, trace_ax = TracePlot(mcmc_chains, fit_dict)
+        if plot == True:
+            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
+
+        # Plot autocorrelation of MCMC chains
         if verbose:
             print(name_bracket_prefix + 'Evaluating MCMC autocorrelation')
         autocorr_fig, autocorr_ax = Autocorr(mcmc_chains, fit_dict)
@@ -198,7 +208,7 @@ def Fit(gal_dict,
                     autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Autocorrelation.png'), dpi=150)
 
         # Remove burnin from chains
-        mcmc_burn = np.max(mcmc_burn, axis=0)
+        mcmc_burn = [20000] * mcmc_chains.shape[1]
         mcmc_chains_burn = mcmc_chains.copy()
         mcmc_lnprob_burn = copy.deepcopy(mcmc_sampler._lnprob)
         for i in range(mcmc_chains.shape[0]):
@@ -1114,47 +1124,93 @@ def Autocorr(mcmc_chains, fit_dict):
 
     # Generate figure, with subplot for each parameter
     labels = ParamsLabel(fit_dict)
-    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(12,(2*fit_dict['n_params'])))
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1,
+                           figsize=(8,(1.5*fit_dict['n_params'])), sharex=True, squeeze=True)
 
-    # Initiate record-keeping variables, and loop over parameters, then loop over chains    
+    # Initiate record-keeping variables, and loop over parameters, then loop over chains
     autocorr_time = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
             # Compute autocorrelation function and time and burn-in for chain
             autocorr_func = acor.function(mcmc_chains[j, :, i])
-            autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])
-            print('##### THIS ISN\'T HOW BURN-IN WORKS #####')
+            autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])[0]
 
             # Plot autocorrelation function and autocorrelation time
             autocorr_func_conv = scipy.ndimage.filters.gaussian_filter(autocorr_func, 10)
             palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
             ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), autocorr_func_conv, color=palette[j], alpha=0.65, lw=1.0)
-            ax[i].plot([autocorr_time[i,j],autocorr_time[i,j]], [1E5,-1E5], c=palette[j], ls=':')
+            #ax[i].plot([autocorr_time[i,j],autocorr_time[i,j]], [1E5,-1E5], c=palette[j], ls=':')
 
-        # Format axis        
-        ax[i].set_ylim(-1, 1)        
+        # Format axis
+        ax[i].set_ylim(-1, 1)
         ax[i].set_ylabel('${\it ACF\, (}$'+labels[i]+'${\it )}$')
 
     # Plot autocorrelation time on axes, and format accordingly
-    autocorr_xlim = min(mcmc_chains.shape[1], 5000. * np.ceil((0.6*mcmc_chains.shape[1]) / 5000.)
+    autocorr_xlim = min(mcmc_chains.shape[1], 5000. * np.ceil((0.6*mcmc_chains.shape[1]) / 5000.))
     for i in range(mcmc_chains.shape[2]):
         ax[i].set_xlim(0, autocorr_xlim)
+        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=5, min_n_ticks=4, prune='lower'))
 
     # Perform final formatting, and return figure and axes objects
-    ax[-1:][0].set_xlabel('Step')
+    ax[-1:][0].set_xlabel('MCMC Step')
     fig.tight_layout()
+    fig.subplots_adjust(hspace=0)
     return fig, ax
 
 
-	
-	
 
-def TracePlot(mcmc_chains, mcmc_n_burn, fit_dict):
-    """ Function to produce a trace plot showing the MCMC chains """
+
+
+def TracePlot(mcmc_chains, fit_dict):
+    """ Function to produce a trace plot showing the MCMC chains, and use it to identify burn-in """
 
     # Enable seaborn for easy, attractive plots
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
     sns.set_style('ticks')
-    palette = sns.color_palette('muted', n_colors=fit_dict['n_params'])
+
+    # Define colour palettes to use for different parameters (up to three components)
+    temp_palettes = ['PuBu', 'PuBuGn', 'PuGn']
+    mass_palettes = ['BuPu', 'PuRd', 'RdPu']
+    beta_palettes = ['GnBu', 'YlGnBu', 'YlGn']
+    correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
+
+    # Create dummy parameter vectors, just to find out how many parameters there are
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(mcmc_chains[0,0,:], fit_dict)
+
+    # Assign colour palettes to components, and bundle into combined palettes list
+    temp_palettes = np.repeat(temp_palettes, int(np.ceil(float(len(temp_vector))/float(len(temp_palettes))))).tolist()[:len(temp_vector)]
+    mass_palettes = np.repeat(mass_palettes, int(np.ceil(float(len(mass_vector))/float(len(mass_palettes))))).tolist()[:len(mass_vector)]
+    beta_palettes = np.repeat(beta_palettes, int(np.ceil(float(len(fit_dict['beta']))/float(len(beta_palettes))))).tolist()[:len(fit_dict['beta'])]
+    correl_err_palettes = np.repeat(correl_err_palettes, int(np.ceil(float(len(correl_err_vector))/float(len(correl_err_palettes))))).tolist()[:len(correl_err_vector)]
+    palettes = temp_palettes + mass_palettes + beta_palettes + correl_err_palettes
+
+    # Generate figure, with subplot for each parameter
+    labels = ParamsLabel(fit_dict)
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1,
+                           figsize=(8,(1.5*fit_dict['n_params'])), sharex=True, squeeze=True)
+
+    # Put masses into log space
+    mcmc_chains = mcmc_chains.copy()
+    for i in range(len(labels)):
+        if labels[i][:2] == '$M':
+            mcmc_chains[:,:,i] = np.log10(mcmc_chains[:,:,i])
+
+    # Initiate record-keeping variables, and loop over parameters, then loop over chains
+    for i in range(mcmc_chains.shape[2]):
+        for j in range(mcmc_chains.shape[0]):
+
+            # Plot chains
+            palette = sns.color_palette(palettes[i]+'_d', mcmc_chains.shape[0])
+            ax[i].plot(range(mcmc_chains[j, :, i].shape[0]), mcmc_chains[j, :, i], color=palette[j], alpha=0.3, lw=0.8)
+
+        # Format axis
+        ax[i].set_ylabel(labels[i])
+        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=5, min_n_ticks=4, prune='both'))
+
+    # Perform final formatting, and return figure and axes objects
+    ax[-1:][0].set_xlabel('MCMC Step')
+    fig.tight_layout()
+    fig.subplots_adjust(hspace=0)
+    return fig, ax
