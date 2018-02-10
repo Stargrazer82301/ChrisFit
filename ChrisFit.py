@@ -24,6 +24,7 @@ import termcolor
 import acor
 import corner
 import emcee
+from ChrisFuncs import GelmanRubin
 
 # Disable interactive plotting
 plt.ioff()
@@ -215,27 +216,29 @@ def Fit(gal_dict,
             mcmc_chains_burn[i, :min(int(mcmc_burn[i]),mcmc_chains_burn.shape[1]), :] = np.nan
             mcmc_lnprob_burn[i, :min(int(mcmc_burn[i]),mcmc_lnprob_burn.shape[1])] = np.nan
 
-        # Combine MCMC chains into final posteriors for each parameter
+        # Combine MCMC chains into final posteriors for each parameter, and find median of each parameter
         mcmc_samples = mcmc_chains_burn.reshape((-1, n_params))
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
 
-        # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimate
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
-        median_params = np.median(mcmc_samples, axis=0)
+        # Use nested n-dimensional histograms to localise highest-probability region of posterior
+        if verbose:
+            print(name_bracket_prefix + 'Finding peak of posterior distribution')
+        hist_density, hist_edges = np.histogramdd(mcmc_samples, bins=20)
+        hist_max = np.where(hist_density==hist_density.max())
+        hist_max_bin = np.zeros([mcmc_chains.shape[2], 2])
+        for i in range(mcmc_chains.shape[2]):
+            hist_max_bin[i,0], hist_max_bin[i,1] = hist_edges[i][hist_max[i]][0], hist_edges[i][hist_max[i]+1][0]
+        nesthist_density, nesthist_edges = np.histogramdd(mcmc_samples, bins=20, range=hist_max_bin)
+        nesthist_max = np.where(hist_density==hist_density.max())
+        nesthist_peak = np.zeros([mcmc_chains.shape[2]])
+        for i in range(mcmc_chains.shape[2]):
+            nesthist_peak[i] = nesthist_edges[i][nesthist_max[i]][0] + (0.5 * (nesthist_edges[i][1]-nesthist_edges[i][0]))
+        mape_params = nesthist_peak
 
         # If requested, commence plotting
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating plots of results')
-
-            """# Plot trace of MCMC chains
-            trace_fig, trace_ax = TracePlot(mcmc_chains, mcmc_burn, fit_dict)
-            if plot == True:
-                trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
-            elif plot != False:
-                if isinstance(plot, str):
-                    if os.path.exists(plot):
-                        trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)"""
 
             # Plot posterior corner plot
             corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
@@ -246,8 +249,8 @@ def Fit(gal_dict,
                     if os.path.exists(plot):
                         corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
-            # Plot median SED
-            sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
+            # Plot SED
+            sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
             if plot == True:
                 sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
             elif plot != False:
@@ -1095,11 +1098,11 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
     return fig, ax
 
 
-	
-	
+
+
 
 def Autocorr(mcmc_chains, fit_dict):
-    """ Function to analyse the autocorrelation of the MCMC chains to identify burnin """
+    """ Function to plot the autocorrelation of the MCMC chains """
 
     # Enable seaborn for easy, attractive plots
     plt.ioff()
