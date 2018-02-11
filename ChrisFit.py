@@ -24,7 +24,6 @@ import termcolor
 import acor
 import corner
 import emcee
-from ChrisFuncs import GelmanRubin
 
 # Disable interactive plotting
 plt.ioff()
@@ -744,6 +743,31 @@ def LikeBounds(params, fit_dict):
 
     # If we've gotten this far, then everything is fine
     return True
+
+
+
+
+
+
+def GelmanRubin(chain):
+    """ Function to calculate Gelman-Rubin (1992) MCMC convergance criterion, adapted from Jorg Dietrich's blog; a G-R
+    criterion of >1.1 is typically considered evidence for non-convergance """
+
+    # Evaluate variance within chains
+    variance = np.var(chain, axis=1, ddof=1)
+    W = np.mean(variance, axis=0)
+
+    # Evaluate variance between chains
+    theta_b = np.mean(chain, axis=1)
+    theta_bb = np.mean(theta_b, axis=0)
+    m = chain.shape[0]
+    n = chain.shape[1]
+    B = n / (m - 1) * np.sum((theta_bb - theta_b)**2, axis=0)
+    var_theta = (n - 1) / n * W + 1 / n * B
+
+    # Calculate  and return R-hat
+    R_hat = np.sqrt(var_theta / W)
+    return R_hat
 
 
 
