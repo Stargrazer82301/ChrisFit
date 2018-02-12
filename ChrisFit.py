@@ -753,27 +753,119 @@ def LikeBounds(params, fit_dict):
 
 
 
+def ChainClean(mcmc_chains):
+    """ Function to identify and remove chains, and portions of chains, exhibiting non-convergence """
+
+    # Create copy of chains to work with
+    mcmc_chains = mcmc_chains.copy()
+
+    # Loop over chains and parameters, to find Geweke z-score for each
+    for i in range(mcmc_chains.shape[0]):
+        burnin = int(0.1 * mcmc_chains.shape[2])
+        for j in range(mcmc_chains.shape[2]):
+            geweke = Geweke(mcmc_chains[i,:,j])
+
+            # Find where Geweke score crosses 0 for first time; assume this represents burn-in
+            if geweke[0,1] > 0:
+                burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]<0)[0].min(), 0]))
+            elif geweke[0,1] < 0:
+                burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]>0)[0].min(), 0]))
+
+            # Set burn-in steps to be NaN
+            mcmc_chains[i,:burnin,j] = np.nan
+
+    # Loop over chains and parameters, to check for metatstability
+    bad_chains = np.array([False]*mcmc_chains.shape[0])
+    for i in range(mcmc_chains.shape[0]):
+        for j in range(mcmc_chains.shape[2]):
+
+            # To check for metastability, first compute the median values of the final 40% of each chain
+            test_chain = mcmc_chains[i,-int(0.4*mcmc_chains.shape[1]):,j]
+            test_median = np.median(test_chain)
+            comp_indices = np.array(range(mcmc_chains.shape[0]))
+            comp_indices = comp_indices[np.where(comp_indices!=i)]
+            comp_chains = mcmc_chains[comp_indices,-int(0.4*mcmc_chains.shape[1]):,j]
+            comp_medians = np.median(comp_chains, axis=1)
+            comp_medians_median = np.median(comp_medians)
+
+            # Perform nonparametric bootstrap resample of medians
+            comp_medians_bs = np.array([sklearn.utils.resample(comp_medians) for k in range(10000)])
+
+            # Subtract median of each set of bootstrapped values from themselves (ie, find deviations from the median of each set of medians)
+            comp_medians_bs_dev = comp_medians_bs - np.array([np.median(comp_medians_bs, axis=1)]*comp_medians_bs.shape[1]).transpose()
+
+            # Find the RMS deviation within each bootstrapped set of deviations, and use thrice this as the rejection threshold
+            comp_medians_bs_rms = np.mean(np.abs(comp_medians_bs_dev), axis=1)
+            comp_medians_bs_thresh = 3.0 * np.median(comp_medians_bs_rms)
+
+            # If median temp of current chain section is more than the determined threshold, call it metastable
+            if abs(test_median - comp_medians_median) > comp_medians_bs_thresh:
+                bad_chains[i] = True
+
+    # Set all values, for all parameters, in suspected metastable chains to be NaN
+    mcmc_chains[bad_chains,:,:] = np.nan
+
+    # Calculate the Gelman-Rubin criterion of each parameter from different start points
+    gr_times = np.linspace(0, mcmc_chains.shape[1]-1, num=100).astype(int)[1:]
+    gr = np.zeros([gr_times.shape[0], mcmc_chains.shape[2]])
+    for i in range(len(gr_times)):
+        t = gr_times[i]
+        gr[i,:] = GelmanRubin(mcmc_chains[:,-t:,:])
+
+    # Return cleaned chain
+    return mcmc_chains
 
 
-def GelmanRubin(chain):
+
+
+
+def GelmanRubin(mcmc_chains):
     """ Function to calculate Gelman-Rubin (1992) MCMC convergance criterion, adapted from Jorg Dietrich's blog; a G-R
     criterion of >1.1 is typically considered evidence for non-convergance. Chains of form (n_walkers, n_steps) """
 
     # Evaluate variance within chains
-    variance = np.var(chain, axis=1, ddof=1)
-    W = np.mean(variance, axis=0)
+    variance = np.nanvar(mcmc_chains, axis=1, ddof=1)
+    within_variance = np.nanmean(variance, axis=0)
 
     # Evaluate variance between chains
-    theta_b = np.mean(chain, axis=1)
-    theta_bb = np.mean(theta_b, axis=0)
-    m = chain.shape[0]
-    n = chain.shape[1]
-    B = n / (m - 1) * np.sum((theta_bb - theta_b)**2, axis=0)
-    var_theta = (n - 1) / n * W + 1 / n * B
+    theta_b = np.nanmean(mcmc_chains, axis=1)
+    theta_bb = np.nanmean(theta_b, axis=0)
+    walkers = float(mcmc_chains.shape[0])
+    steps = float(mcmc_chains.shape[1])
+    between_variance = steps / (walkers - 1) * np.sum((theta_bb - theta_b)**2, axis=0)
+    var_theta = (((steps - 1.) / steps) * within_variance) + (((walkers + 1.) / (walkers * steps)) * between_variance)
 
     # Calculate  and return R-hat
-    R_hat = np.sqrt(var_theta / W)
-    return R_hat
+    r_hat = np.sqrt(var_theta / within_variance)
+    return r_hat
+
+
+
+
+def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
+    """ Function to compute Geweke z-scores for a whole bunch of small sections of chain, with all being compared to the
+    a given portion of the end of the entire chain """
+
+    # Extract benchmark section of chain, and calculate necessary values
+    comp_chain = mcmc_chain[int(comp_frac*len(mcmc_chain)):len(mcmc_chain)]
+    comp_mean = np.mean(comp_chain)
+    comp_var = np.var(comp_chain)
+
+    # Identify increments to examine in test region
+    test_end = int(len(mcmc_chain) - comp_frac*len(mcmc_chain))
+    test_steps = np.arange(test_intrv, test_end, test_intrv)
+
+    # Loop over test increments, computing and recording geweke z-scores
+    geweke = np.zeros([len(test_steps), 2])
+    geweke[:,0] = test_steps
+    for i in range(len(test_steps)):
+        test_chain = mcmc_chain[test_steps[i]-test_intrv:test_steps[i]]
+        test_mean = np.mean(test_chain)
+        test_var = np.var(test_chain)
+        geweke[i,1] = (test_mean - comp_mean) / np.sqrt(test_var + comp_var)
+
+    # Return geweke scores
+    return geweke
 
 
 
@@ -876,7 +968,7 @@ def Numpify(var, n_target=False):
 
 
 
-def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
+def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_only=False):
     """ Function to plot an SED, with the same information used to produce fit """
 
     # Enable seaborn for easy, attractive plots
@@ -907,9 +999,10 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     fit_fluxes_tot = np.sum(fit_fluxes, axis=0)
 
     # Plot fits
-    for i in range(fit_dict['components']):
-        ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
-    ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
+    if posterior_only:
+        for i in range(fit_dict['components']):
+            ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
+        ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
 
     # Colour-correct fluxes according to model being plotted
     bands_frame.loc[:,'flux_corr'] = bands_frame['flux'].copy()
@@ -1086,7 +1179,7 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
         fig = corner.corner(mcmc_samples,
                             labels=labels,
                             quantiles=[0.16,0.5,0.84],
-                            #range=[0.99999]*len(labels),
+                            range=[0.999]*len(labels),
                             show_titles=True,
                             truths=params_highlight,
                             hist_kwargs={'edgecolor':'none'})
@@ -1103,7 +1196,7 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
                 values = np.array(mcmc_samples[:,i])[:,np.newaxis]
                 bandwidth = 2.0 * ( 2.0 * (np.percentile(values,75)-np.percentile(values,25)) ) / values.size**0.333#np.ptp(np.histogram(trace.get_values(varname),bins='fd')[1][:2])
                 bandwidth = max(bandwidth, 0.01)
-                kde = KernelDensity(kernel='epanechnikov', bandwidth=bandwidth).fit(values)
+                kde = sklearn.neighbors.KernelDensity(kernel='epanechnikov', bandwidth=bandwidth).fit(values)
                 line_x = np.linspace(np.nanmin(values), np.nanmax(values), 10000)[:,np.newaxis]
                 line_y = kde.score_samples(line_x)
                 line_y = np.exp(line_y)
@@ -1172,7 +1265,7 @@ def Autocorr(mcmc_chains, fit_dict):
     autocorr_xlim = min(mcmc_chains.shape[1], 5000. * np.ceil((0.6*mcmc_chains.shape[1]) / 5000.))
     for i in range(mcmc_chains.shape[2]):
         ax[i].set_xlim(0, autocorr_xlim)
-        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=5, min_n_ticks=4, prune='lower'))
+        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6, min_n_ticks=5, prune='lower'))
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('MCMC Step')
@@ -1229,7 +1322,7 @@ def TracePlot(mcmc_chains, fit_dict):
 
         # Format axis
         ax[i].set_ylabel(labels[i])
-        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=5, min_n_ticks=4, prune='both'))
+        ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6, min_n_ticks=5, prune='both'))
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('MCMC Step')
