@@ -155,7 +155,7 @@ def Fit(gal_dict,
         mle_fit_dict['correl_unc'] = False
         mle_initial = MaxLikeInitial(mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
-        # Find Maximum Likelihood Estimate (MLE)
+        """# Find Maximum Likelihood Estimate (MLE)
         if verbose:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
@@ -167,7 +167,7 @@ def Fit(gal_dict,
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
         mape_params = mle_params.copy()
 
-        # Generate starting position for MCMC walkers, in small Gaussian cluster around maximum-likelihood position
+        # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
@@ -751,7 +751,7 @@ def LikeBounds(params, fit_dict):
 
 def GelmanRubin(chain):
     """ Function to calculate Gelman-Rubin (1992) MCMC convergance criterion, adapted from Jorg Dietrich's blog; a G-R
-    criterion of >1.1 is typically considered evidence for non-convergance """
+    criterion of >1.1 is typically considered evidence for non-convergance. Chains of form (n_walkers, n_steps) """
 
     # Evaluate variance within chains
     variance = np.var(chain, axis=1, ddof=1)
