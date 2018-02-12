@@ -18,12 +18,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import seaborn as sns
-from sklearn.neighbors import KernelDensity
+import sklearn.neighbors
 import progress.bar
 import termcolor
 import acor
 import corner
 import emcee
+import pymc
 
 # Disable interactive plotting
 plt.ioff()
@@ -184,11 +185,19 @@ def Fit(gal_dict,
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
-        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
-        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))"""
+        mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+
+        # Identify and remove portions of chains exhibiting burn-in and meta-stability
+        if verbose:
+            print(name_bracket_prefix + 'Removing burn-in and metastable chains')
+        mcmc_chains_clean = ChainClean(mcmc_chains)
 
         # Plot trace of MCMC chains
-        trace_fig, trace_ax = TracePlot(mcmc_chains, fit_dict)
+        if plot:
+            if verbose:
+                print(name_bracket_prefix + 'Generating trace plot')
+        trace_fig, trace_ax = TracePlot(mcmc_chains_clean, fit_dict)
         if plot == True:
             trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
         elif plot != False:
@@ -197,8 +206,9 @@ def Fit(gal_dict,
                     trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
 
         # Plot autocorrelation of MCMC chains
-        if verbose:
-            print(name_bracket_prefix + 'Evaluating MCMC autocorrelation')
+        if plot:
+            if verbose:
+                print(name_bracket_prefix + 'Generating autocorrelation plot')
         autocorr_fig, autocorr_ax = Autocorr(mcmc_chains, fit_dict)
         if plot == True:
             autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
@@ -207,48 +217,44 @@ def Fit(gal_dict,
                 if os.path.exists(plot):
                     autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Autocorrelation.png'), dpi=150)
 
-        # Remove burnin from chains
-        mcmc_burn = [20000] * mcmc_chains.shape[1]
-        mcmc_chains_burn = mcmc_chains.copy()
-        mcmc_lnprob_burn = copy.deepcopy(mcmc_sampler._lnprob)
-        for i in range(mcmc_chains.shape[0]):
-            mcmc_chains_burn[i, :min(int(mcmc_burn[i]),mcmc_chains_burn.shape[1]), :] = np.nan
-            mcmc_lnprob_burn[i, :min(int(mcmc_burn[i]),mcmc_lnprob_burn.shape[1])] = np.nan
-
-        # Combine MCMC chains into final posteriors for each parameter, and find median of each parameter
-        mcmc_samples = mcmc_chains_burn.reshape((-1, n_params))
+        # Combine MCMC chains into final posteriors for each parameter, excludig any samples that contain NaNs
+        mcmc_samples = mcmc_chains_clean.reshape((-1, n_params))
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
+        mcmc_samples = np.delete(mcmc_samples, list(set(np.where(np.isnan(mcmc_samples))[0].tolist())), axis=0)
 
-        # Find Maximum A Posteriori Estimate (MAPE) and median parameter estimates
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        """# Find Maximum A Posteriori Estimate (MAPE) and median parameter estimates
+        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]"""
         median_params = np.median(mcmc_samples, axis=0)
 
-        # If requested, commence plotting
+        # Plot posterior corner plot
         if plot:
             if verbose:
-                print(name_bracket_prefix + 'Generating plots of results')
+                print(name_bracket_prefix + 'Generating corner plot')
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*len(median_params), fit_dict)
+        if plot == True:
+            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
 
-            # Plot posterior corner plot
-            corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params.copy(), fit_dict)
-            if plot == True:
-                corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
-            elif plot != False:
-                if isinstance(plot, str):
-                    if os.path.exists(plot):
-                        corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
-
-            # Plot SED
-            sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
-            if plot == True:
-                sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
-            elif plot != False:
-                if isinstance(plot, str):
-                    if os.path.exists(plot):
-                        sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
+        # Plot SED
+        if plot:
+            if verbose:
+                print(name_bracket_prefix + 'Generating SED plot')
+        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples, posterior_only=True)
+        if plot == True:
+            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
+        elif plot != False:
+            if isinstance(plot, str):
+                if os.path.exists(plot):
+                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
 
         # Return results
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
+
+        pdb.set_trace()
 
 
 
