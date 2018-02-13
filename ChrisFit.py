@@ -222,15 +222,26 @@ def Fit(gal_dict,
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
         mcmc_samples = np.delete(mcmc_samples, list(set(np.where(np.isnan(mcmc_samples))[0].tolist())), axis=0)
 
-        """# Find Maximum A Posteriori Estimate (MAPE) and median parameter estimates
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]"""
+        # Find Maximum A Posteriori Estimate (MAPE), median, and modal parameter estimates
         median_params = np.median(mcmc_samples, axis=0)
+        """mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        modal_params = np.zeros([n_params])
+        modal_labels = ParamsLabel(fit_dict)
+        for i in range(n_params):
+            modal_dist = mcmc_samples[:,i].copy()
+            if modal_labels[i][:2] == '$M':
+                modal_dist = np.log10(modal_dist)
+                modal_hist = np.histogram(modal_dist, bins=100, range=(np.percentile(modal_dist, [1,99])))
+                modal_params[i] = 10.**modal_hist[1][np.argmax(modal_hist[0])] + (modal_hist[1][1] - modal_hist[1][0])
+            else:
+                modal_hist = np.histogram(modal_dist, bins=100, range=(np.percentile(modal_dist, [1,99])))
+                modal_params[i] = modal_hist[1][np.argmax(modal_hist[0])] + (modal_hist[1][1] - modal_hist[1][0])"""
 
         # Plot posterior corner plot
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*len(median_params), fit_dict)
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
         elif plot != False:
