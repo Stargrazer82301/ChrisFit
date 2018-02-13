@@ -111,9 +111,9 @@ def Fit(gal_dict,
 
         # State name of source being processed
         if sys.stdout.isatty():
-            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
+            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(20-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
         else:
-            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(12-len('['+gal_dict['name']+']')))
+            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(20-len('['+gal_dict['name']+']')))
         if verbose:
             print(name_bracket_prefix  + 'Commencing processing')
 
@@ -241,7 +241,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mle_params, fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
         elif plot != False:

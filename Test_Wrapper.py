@@ -53,14 +53,14 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 out_dir = 'Output/'
 
 # List target galaxies (skipping galaxies already processed)
-target_gals = ['NGC4030','NGC4559','NGC5496','NGC5658','NGC5690','NGC5691','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09470','UGC09482','NGC4030','NGC5584','NGC5705','UGC09299']
-processed_gals = set([processed_gal.split('_')[:-1][0] for processed_gal in os.listdir(out_dir)])
+target_gals = ['NGC4030','NGC4559','NGC5496','NGC5584','NGC5658','NGC5690','NGC5691','NGC5705','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09299','UGC09470','UGC09482']
+processed_gals = set([processed_gal.split('_')[:-1][0] for processed_gal in os.listdir(out_dir) if '.png' in processed_gal])
 target_gals = list(set(target_gals) - processed_gals)
 
 # Loop over galaxies
 for g in np.random.permutation(cat_frame.index):
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in target_gals:
+    if cat_frame_gal['name'] not in ['NGC4030','NGC4559']:#,'NGC5713','NGC5719','NGC5750','NGC5584','NGC5705','NGC5750','UGC09299']:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
@@ -86,15 +86,15 @@ for g in np.random.permutation(cat_frame.index):
             bands_frame_gal.loc[b,'error'] = np.NaN
 
     # Call ChrisFit
-    out_dict = ChrisFit.Fit(gal_dict,
-                            bands_frame_gal,
-                            correl_unc = correl_unc,
-                            beta_vary = True,
-                            beta = 2.0,
-                            components = 2,
-                            kappa_0 = 0.051,
-                            kappa_0_lambda = 500E-6,
-                            mcmc_n_walkers = 12,
-                            mcmc_n_steps = 50000,
-                            plot = out_dir)
+    posterior = ChrisFit.Fit(gal_dict,
+                             bands_frame_gal,
+                             correl_unc = correl_unc,
+                             beta_vary = True,
+                             beta = 2.0,
+                             components = 2,
+                             kappa_0 = 0.051,
+                             kappa_0_lambda = 500E-6,
+                             mcmc_n_walkers = 12,
+                             mcmc_n_steps = 50000,
+                             plot = out_dir)
 
