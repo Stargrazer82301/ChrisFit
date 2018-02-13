@@ -25,6 +25,7 @@ import acor
 import corner
 import emcee
 import pymc
+from ChrisFuncs import SigmaClip
 
 # Disable interactive plotting
 plt.ioff()
@@ -156,7 +157,7 @@ def Fit(gal_dict,
         mle_fit_dict['correl_unc'] = False
         mle_initial = MaxLikeInitial(mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
-        """# Find Maximum Likelihood Estimate (MLE)
+        # Find Maximum Likelihood Estimate (MLE)
         if verbose:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
@@ -166,7 +167,6 @@ def Fit(gal_dict,
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
-        mape_params = mle_params.copy()
 
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
@@ -185,8 +185,8 @@ def Fit(gal_dict,
         else:
             mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
         mcmc_chains = mcmc_sampler.chain
-        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))"""
-        mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
+        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
 
         # Identify and remove portions of chains exhibiting burn-in and meta-stability
         if verbose:
@@ -253,7 +253,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
-        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples, posterior_only=True)
+        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
@@ -264,8 +264,7 @@ def Fit(gal_dict,
         # Return results
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
-
-        pdb.set_trace()
+        return mcmc_samples
 
 
 
@@ -705,7 +704,7 @@ def PriorsConstruct(fit_dict):
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
     mass_mode *= 10**((temp_mode-temp_mode[0])/-20)
     mass_mode = np.log10(mass_mode)
-    mass_sigma = np.array([5.0] * fit_dict['components'])
+    mass_sigma = np.array([10.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
         mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
         priors['mass'].append(mass_ln_like)
@@ -772,18 +771,20 @@ def ChainClean(mcmc_chains):
 
     # Loop over chains and parameters, to find Geweke z-score for each
     for i in range(mcmc_chains.shape[0]):
-        burnin = int(0.1 * mcmc_chains.shape[2])
+        burnin = int(0.05 * mcmc_chains.shape[2])
         for j in range(mcmc_chains.shape[2]):
             geweke = Geweke(mcmc_chains[i,:,j])
 
             # Find where Geweke score crosses 0 for first time; assume this represents burn-in
-            if geweke[0,1] > 0:
+            if (np.min(geweke[:,1]) >= 0) or (np.max(geweke[:,1]) <= 0):
+                burnin = mcmc_chains.shape[1]
+            elif geweke[0,1] > 0:
                 burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]<0)[0].min(), 0]))
             elif geweke[0,1] < 0:
                 burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]>0)[0].min(), 0]))
 
-            # Set burn-in steps to be NaN
-            mcmc_chains[i,:burnin,j] = np.nan
+        # Set burn-in steps to be NaN
+        mcmc_chains[i,:burnin,:] = np.nan
 
     # Loop over chains and parameters, to check for metatstability
     bad_chains = np.array([False]*mcmc_chains.shape[0])
@@ -807,7 +808,7 @@ def ChainClean(mcmc_chains):
 
             # Find the RMS deviation within each bootstrapped set of deviations, and use thrice this as the rejection threshold
             comp_medians_bs_rms = np.mean(np.abs(comp_medians_bs_dev), axis=1)
-            comp_medians_bs_thresh = 3.0 * np.median(comp_medians_bs_rms)
+            comp_medians_bs_thresh = 2.0 * np.median(comp_medians_bs_rms)
 
             # If median temp of current chain section is more than the determined threshold, call it metastable
             if abs(test_median - comp_medians_median) > comp_medians_bs_thresh:
@@ -849,6 +850,7 @@ def GelmanRubin(mcmc_chains):
     # Calculate  and return R-hat
     r_hat = np.sqrt(var_theta / within_variance)
     return r_hat
+
 
 
 
@@ -1010,7 +1012,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
     fit_fluxes_tot = np.sum(fit_fluxes, axis=0)
 
     # Plot fits
-    if posterior_only:
+    if not posterior_only:
         for i in range(fit_dict['components']):
             ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
         ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
@@ -1187,15 +1189,11 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
 
     # Plot posterior corner diagrams (with histograms hidden)
     try:
-        fig = corner.corner(mcmc_samples,
-                            labels=labels,
-                            quantiles=[0.16,0.5,0.84],
-                            range=[0.999]*len(labels),
-                            show_titles=True,
-                            truths=params_highlight,
-                            hist_kwargs={'edgecolor':'none'})
+        fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84], range=[0.999]*len(labels),
+                            show_titles=True, truths=params_highlight, hist_kwargs={'edgecolor':'none'})
     except:
-        pdb.set_trace()
+        fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84],
+                            show_titles=True, truths=params_highlight, hist_kwargs={'edgecolor':'none'})
 
     # Loop over variables and subplots, finding histogram subplot corresponding to each variable
     for i in range(len(labels)):
