@@ -224,8 +224,8 @@ def Fit(gal_dict,
 
         # Find Maximum A Posteriori Estimate (MAPE), median, and modal parameter estimates
         median_params = np.median(mcmc_samples, axis=0)
-        """mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
-        modal_params = np.zeros([n_params])
+        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        """modal_params = np.zeros([n_params])
         modal_labels = ParamsLabel(fit_dict)
         for i in range(n_params):
             modal_dist = mcmc_samples[:,i].copy()
@@ -241,7 +241,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mle_params, fit_dict)
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params, fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
         elif plot != False:
@@ -253,7 +253,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
-        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
+        sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
@@ -275,7 +275,7 @@ def LnLike(params, fit_dict):
 
     # Deal with parameter bounds, if they are required (for example, if we're doing a maximum-likelihood estimation)
     if fit_dict['bounds']:
-        if not LikeBounds(params, fit_dict):
+        if not MaxLikeBounds(params, fit_dict):
             return -np.inf
 
     # Programatically extract dust temperature, dust mass, and beta (variable or fixed) parameter sub-vectors from params tuple
