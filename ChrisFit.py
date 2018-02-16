@@ -495,6 +495,55 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
 
 
+def PriorsConstruct(fit_dict):
+    """ Function to auitomatically construct a set of default priors, given the basic parameters of the model as
+    described by the ChrisFit input """
+
+    # Initialise dictionary to hold priors
+    priors = {'temp':[],
+              'mass':[],
+              'beta':[]}
+
+    # Define function to find scaling factor for gamma distribution of given mode, alpha, and location
+    GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
+
+    # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
+    temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
+    temp_mode = np.linspace(20.0, 55.0, num=fit_dict['components'])
+    temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
+    for i in range(fit_dict['components']):
+        temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
+        temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
+        priors['temp'].append(temp_ln_like)
+
+    # Use flux and distance to estimate likely cold dust mass, based on empirical relation
+    bands_frame = fit_dict['bands_frame']
+    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    peak_lum = peak_flux * fit_dict['distance']**2.0
+    peak_mass = 10**(np.log10(peak_lum)-8)
+
+    # Use likely cold dust mass to construct mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
+    mass_mode = np.array([peak_mass] * fit_dict['components'])
+    mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
+    mass_mode *= 10**((temp_mode-temp_mode[0])/-20)
+    mass_mode = np.log10(mass_mode)
+    mass_sigma = np.array([10.0] * fit_dict['components'])
+    for i in range(fit_dict['components']):
+        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
+        priors['mass'].append(mass_ln_like)
+
+    # Create beta priors, using gamma distribution
+    if fit_dict['beta_vary']:
+        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3, loc=0, scale=1))
+        priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
+
+    # Return completed priors dictionary
+    return priors
+
+
+
+
+
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
     (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
@@ -667,55 +716,6 @@ def MCMCInitial(mle_params, fit_dict):
 
     # Return generated initial positions
     return mcmc_initial
-
-
-
-
-
-def PriorsConstruct(fit_dict):
-    """ Function to auitomatically construct a set of default priors, given the basic parameters of the model as
-    described by the ChrisFit input """
-
-    # Initialise dictionary to hold priors
-    priors = {'temp':[],
-              'mass':[],
-              'beta':[]}
-
-    # Define function to find scaling factor for gamma distribution of given mode, alpha, and location
-    GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
-
-    # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
-    temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
-    temp_mode = np.linspace(20.0, 55.0, num=fit_dict['components'])
-    temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
-    for i in range(fit_dict['components']):
-        temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
-        temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
-        priors['temp'].append(temp_ln_like)
-
-    # Use flux and distance to estimate likely cold dust mass, based on empirical relation
-    bands_frame = fit_dict['bands_frame']
-    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
-    peak_lum = peak_flux * fit_dict['distance']**2.0
-    peak_mass = 10**(np.log10(peak_lum)-8)
-
-    # Use likely cold dust mass to construct mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
-    mass_mode = np.array([peak_mass] * fit_dict['components'])
-    mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
-    mass_mode *= 10**((temp_mode-temp_mode[0])/-20)
-    mass_mode = np.log10(mass_mode)
-    mass_sigma = np.array([10.0] * fit_dict['components'])
-    for i in range(fit_dict['components']):
-        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
-        priors['mass'].append(mass_ln_like)
-
-    # Create beta priors, using gamma distribution
-    if fit_dict['beta_vary']:
-        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3, loc=0, scale=1))
-        priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
-
-    # Return completed priors dictionary
-    return priors
 
 
 
