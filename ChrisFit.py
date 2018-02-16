@@ -155,7 +155,7 @@ def Fit(gal_dict,
         mle_fit_dict = copy.deepcopy(fit_dict)
         mle_fit_dict['bounds'] = True
         mle_fit_dict['correl_unc'] = False
-        mle_initial = MaxLikeInitial(mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
+        mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         # Find Maximum Likelihood Estimate (MLE)
         if verbose:
