@@ -637,7 +637,7 @@ def ParamsLabel(fit_dict):
 
 
 
-def MaxLikeInitial(fit_dict):
+def MaxLikeInitial(bands_frame, fit_dict):
     """ Function to generate initial guess values for maximum-likelihood fitting """
 
     # Declare list to hold guesses
@@ -721,7 +721,7 @@ def MCMCInitial(mle_params, fit_dict):
 
 
 
-def LikeBounds(params, fit_dict):
+def MaxLikeBounds(params, fit_dict):
     """ Function to check whether parameters for a proposed model violate standard boundary conditions. This is for
     maximum likelihood estimations, where there are no priors to go by. If the parameters are good, the function returns
     a value of True; else, it returns a value of False."""
@@ -745,8 +745,8 @@ def LikeBounds(params, fit_dict):
             if temp_vector[i] < temp_vector[i-1]:
                 return False
 
-    # Check that temperature terms are all physical (ie, temp > 5 kelvin)
-    if np.where(np.array(temp_vector)<5)[0].size > 0:
+    # Check that temperature terms are all physical (ie, 5 < temp < 100 kelvin)
+    if np.where(np.array(temp_vector)<5)[0].size > 0 or np.where(np.array(temp_vector)>300)[0].size > 0:
         return False
 
     # Check that mass terms are all physical (ie, mass > 0 Msol)
@@ -1068,6 +1068,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
                 post_temp_vector, post_mass_vector, post_beta_vector, post_correl_err_vector = ParamsExtract(post[j,:], fit_dict)
                 post_fluxes_indv[j,:,i] = ModelFlux(post_wavelengths, post_temp_vector[i], post_mass_vector[i], fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=post_beta_vector[i])
         post_fluxes_tot[:,:] = np.sum(post_fluxes_indv[:,:,:], axis=2)
+        pdb.set_trace()
 
         # Work out 16th and 84th percentile fluxes at each wavelength
         lim_fluxes_indv = np.zeros([2, post_wavelengths.shape[0], fit_dict['components']])

@@ -52,14 +52,14 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 # State kwarg values
 out_dir = 'Output/'
 beta_vary = True
-mcmc_n_steps = 30000
+mcmc_n_steps = 50000
 
 # Provide NGC4030-specific data
-gal_dict = {'name':'NGC4030_nB_nC_P',
+gal_dict = {'name':'NGC4030_B_P',
             'distance':27.16E6,
             'redshift':3E5/1465.0}
-bands_frame['flux'] =  [1.94555,np.nan,18.780,np.nan,np.nan,61.02059,np.nan,69.35811,36.79235,14.85421,14.35777,5.13439,3.796851,0.62050974,0.331933]
-bands_frame['error'] =  [0.32694,np.nan,3.75640,np.nan,np.nan,8.51913,np.nan,10.19806,2.77540,1.27614,0.982608782755,0.44821,0.20235413,0.097216487,0.06766073]
+bands_frame['flux'] =  [1.94555,np.nan,18.780,np.nan,np.nan,61.02059,np.nan,69.35811,36.79235,14.85421,14.35777,5.13439,3.796851,0.97216,0.331933]
+bands_frame['error'] =  [0.32694,np.nan,3.75640,np.nan,np.nan,8.51913,np.nan,10.19806,2.77540,1.27614,0.982608782755,0.44821,0.20235413,0.08798,0.06766073]
 
 # Call ChrisFit
 posterior = ChrisFit.Fit(gal_dict,
@@ -75,7 +75,7 @@ posterior = ChrisFit.Fit(gal_dict,
                          plot = out_dir)
 
 # Provide NGC5584-specific data
-gal_dict = {'name':'NGC5584_nB_nC_P',
+gal_dict = {'name':'NGC5584_B_P',
             'distance':28.18E6,
             'redshift':3E5/1638.0}
 bands_frame['flux'] =  [0.33132,np.nan,2.34,np.nan,np.nan,7.9419,np.nan,9.09188,6.34079,3.25695,2.9904351,1.35070,0.94377995,0.33604684,np.nan]
