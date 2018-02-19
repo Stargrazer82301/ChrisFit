@@ -629,11 +629,11 @@ def ParamsLabel(fit_dict):
             band_first = re.compile('[^a-zA-Z]').sub('',fit_dict['correl_unc'][i]['correl_bands'][0])
             band_last = re.compile('[^a-zA-Z]').sub('',fit_dict['correl_unc'][i]['correl_bands'][-1:][0])
             band_match = SequenceMatcher(None, band_first, band_last).find_longest_match(0, len(band_first), 0, len(band_last))
-            if band_match.size == 0:
-                instr = band_first
+            if (band_match.size == 0) or (len(band_first) + len(band_last) == 0):
+                instr = str(i+1)
             else:
                 instr = band_first[band_match.a:band_match.size]
-                labels.append(r'$\upsilon_{'+instr+'}$')
+            labels.append(r'$\upsilon_{'+instr+'}$')
 
     # Return list of labels
     return labels
