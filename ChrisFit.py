@@ -52,7 +52,8 @@ def Fit(gal_dict,
         mcmc_n_walkers = 250,
         mcmc_n_steps = 2500,
         full_posterior = False,
-        verbose = True):
+        verbose = True,
+        test = False):
         """
         Function that runs the ChrisFit dust SED fitting routine.
 
@@ -106,6 +107,8 @@ def Fit(gal_dict,
                     returned, or just the summary of median, credible interval, etc
             verbose:
                     A boolean, stating whether ChrisFit should provide verbose output whilst operating
+            test:
+                    A boolean, stating whether to read in a previously-saved posterior (only really needful for testing)
             """
 
 
@@ -158,35 +161,37 @@ def Fit(gal_dict,
         mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         # Find Maximum Likelihood Estimate (MLE)
-        if verbose:
-            print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
-        NegLnLike = lambda *args: -LnLike(*args)
-        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5)#, options={'maxiter':int(n_params*100)})
-        mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_opt.x, niter=10, T=10.0, minimizer_kwargs={'args':(mle_fit_dict)})
-        mle_params = mle_opt.x
+        if not test:
+            if verbose:
+                print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
+            NegLnLike = lambda *args: -LnLike(*args)
+            mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5)#, options={'maxiter':int(n_params*100)})
+            mle_opt = scipy.optimize.basinhopping(NegLnLike, mle_opt.x, niter=10, T=10.0, minimizer_kwargs={'args':(mle_fit_dict)})
+            mle_params = mle_opt.x
 
-        # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
-        mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+            # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
+            mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
-        # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
-        mcmc_initial = MCMCInitial(mle_params, fit_dict)
+            # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
+            mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
-        # Initiate and run emcee affine-invariant ensemble sampler
-        mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.0)))
-        if verbose:
-            print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
-            mcmc_bar = progress.bar.Bar('Computing MCMC',
-                                        max=mcmc_n_steps,
-                                        fill='=',
-                                        suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
-            for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
-                mcmc_bar.next()
-            mcmc_bar.finish()
-        else:
-            mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
-        mcmc_chains = mcmc_sampler.chain
-        dill.dump(mcmc_chains, open('/home/saruman/spx7cjc/MCMC.dj','wb'))
-        #mcmc_chains = dill.load(open('/home/saruman/spx7cjc/MCMC.dj','rb'))
+            # Initiate and run emcee affine-invariant ensemble sampler
+            mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.0)))
+            if verbose:
+                print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
+                mcmc_bar = progress.bar.Bar('Computing MCMC',
+                                            max=mcmc_n_steps,
+                                            fill='=',
+                                            suffix='%(percent)d%% [%(elapsed_td)s -> %(eta_td)s]')
+                for _, _ in enumerate(mcmc_sampler.sample(mcmc_initial, iterations=mcmc_n_steps)):
+                    mcmc_bar.next()
+                mcmc_bar.finish()
+            else:
+                mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
+            mcmc_chains = mcmc_sampler.chain
+            dill.dump(mcmc_chains, open(os.path.join(plot,'MCMC.dj'),'wb'))
+        elif test:
+            mcmc_chains = dill.load(open(os.path.join(plot,'MCMC.dj'),'rb'))
 
         # Identify and remove portions of chains exhibiting burn-in and meta-stability
         if verbose:

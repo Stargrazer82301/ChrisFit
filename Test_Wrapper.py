@@ -51,7 +51,7 @@ target_gals = list(set(target_gals) - processed_gals)
 # Loop over galaxies
 for g in np.random.permutation(cat_frame.index):
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in ['NGC5705']:
+    if cat_frame_gal['name'] not in ['NGC5496']:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
