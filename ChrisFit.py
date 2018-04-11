@@ -13,6 +13,7 @@ import scipy.stats
 import scipy.interpolate
 import scipy.optimize
 import scipy.ndimage
+import pandas as pd
 import matplotlib
 #matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -62,8 +63,8 @@ def Fit(gal_dict,
                     A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
                     values for the target source in  question
             bands_frame:
-                    A dataframe, with columns called 'band', 'flux', and 'error', providing the relevant
-                    values for each band for the target source in question
+                    A dataframe, with columns called 'band', 'wavelength, 'flux', 'error', and 'limit' providing the
+                    relevant values for each band for the target source in question
 
         Keyword arguments:
             beta_vary:
@@ -227,10 +228,10 @@ def Fit(gal_dict,
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
         mcmc_samples = np.delete(mcmc_samples, list(set(np.where(np.isnan(mcmc_samples))[0].tolist())), axis=0)
 
-        # Find Maximum A Posteriori Estimate (MAPE), median, and modal parameter estimates
+        # Find median, Maximum A Posteriori Estimate (MAPE), and modal parameter estimates
         median_params = np.median(mcmc_samples, axis=0)
-        mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
-        """modal_params = np.zeros([n_params])
+        """mape_params = mcmc_chains[np.where(mcmc_sampler._lnprob == mcmc_sampler._lnprob.max())][0]
+        modal_params = np.zeros([n_params])
         modal_labels = ParamsLabel(fit_dict)
         for i in range(n_params):
             modal_dist = mcmc_samples[:,i].copy()
@@ -246,7 +247,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), mape_params, fit_dict)
+        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
         elif plot != False:
@@ -258,7 +259,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
-        sed_fig, sed_ax = SEDborn(mape_params, fit_dict, posterior=mcmc_samples)
+        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
         elif plot != False:
@@ -269,7 +270,8 @@ def Fit(gal_dict,
         # Return results
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
-        return mcmc_samples
+        if full_posterior:
+            return mcmc_samples
 
 
 
@@ -986,7 +988,7 @@ def Numpify(var, n_target=False):
 
 
 
-def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_only=False):
+def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     """ Function to plot an SED, with the same information used to produce fit """
 
     # Enable seaborn for easy, attractive plots
@@ -1016,8 +1018,8 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
                                     kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector[i])
     fit_fluxes_tot = np.sum(fit_fluxes, axis=0)
 
-    # Plot fits
-    if not posterior_only:
+    # Plot fits (if no full posterior provided)
+    if not isinstance(posterior, np.ndarray):
         for i in range(fit_dict['components']):
             ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
         ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
@@ -1073,9 +1075,14 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
                 post_temp_vector, post_mass_vector, post_beta_vector, post_correl_err_vector = ParamsExtract(post[j,:], fit_dict)
                 post_fluxes_indv[j,:,i] = ModelFlux(post_wavelengths, post_temp_vector[i], post_mass_vector[i], fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=post_beta_vector[i])
         post_fluxes_tot[:,:] = np.sum(post_fluxes_indv[:,:,:], axis=2)
-        pdb.set_trace()
 
-        # Work out 16th and 84th percentile fluxes at each wavelength
+        # Plot translucent SEDs of thinned posterior samples
+        for j in range(post.shape[0]):
+            """for i in range(fit_dict['components']):
+                ax.plot(post_wavelengths*1E6, post_fluxes_indv[j,:,i], ls='-', lw=1.0, c='gray', alpha=0.01)"""
+            ax.plot(post_wavelengths*1E6, post_fluxes_tot[j,:], ls='-', lw=1.0, c='red', alpha=0.0025)
+
+        # Work out 16th, 50th, and 84th percentile fluxes at each wavelength
         lim_fluxes_indv = np.zeros([2, post_wavelengths.shape[0], fit_dict['components']])
         lim_fluxes_tot = np.zeros([2, post_wavelengths.shape[0]])
         for i in range(fit_dict['components']):
@@ -1084,10 +1091,41 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
         lim_fluxes_tot[0,:] = np.percentile(post_fluxes_tot, 16, axis=0)
         lim_fluxes_tot[1,:] = np.percentile(post_fluxes_tot, 84, axis=0)
 
-        # Plot shaded regions
+        # Fit a model to the median fluxes in each small interval of wavelength
+        med_wavelengths = post_wavelengths[::5]
+        med_fluxes_tot = np.median(post_fluxes_tot, axis=0)[::5]
+        med_scatter_tot = np.std(post_fluxes_tot, axis=0)[::5]
+        med_fit_dict = copy.deepcopy(fit_dict)
+        med_fit_dict['bounds'] = True
+        med_bands_frame = pd.DataFrame(columns=fit_dict['bands_frame'].columns)
+        for i in range(len(med_fluxes_tot)-1):
+            med_bands_frame.loc[i] = [str(med_wavelengths[i]), False, med_wavelengths[i], med_fluxes_tot[i], med_scatter_tot[i], True]
+            med_fit_dict['bands_frame'] = med_bands_frame
+        med_initial = params.copy()
+        NegLnLike = lambda *args: -LnLike(*args)
+        med_opt = scipy.optimize.minimize(NegLnLike, med_initial, args=(med_fit_dict), method='Powell', options={'maxiter':500})
+        med_params = med_opt.x
+
+        # Generate fit components for this "median model"
+        med_temp_vector, med_mass_vector, med_beta_vector, med_correl_err_vector = ParamsExtract(med_params, med_fit_dict)
+        med_fit_wavelengths = np.logspace(-5, -2, num=2000)
+        med_fit_fluxes = np.zeros([med_fit_dict['components'], len(fit_wavelengths)])
+        for i in range(med_fit_dict['components']):
+            med_fit_fluxes[i,:] = ModelFlux(med_fit_wavelengths, med_temp_vector[i], med_mass_vector[i], med_fit_dict['distance'],
+                                        kappa_0=med_fit_dict['kappa_0'], kappa_0_lambda=med_fit_dict['kappa_0_lambda'], beta=med_beta_vector[i])
+        med_fit_fluxes_tot = np.sum(fit_fluxes, axis=0)
+        temp_vector, mass_vector, beta_vector, correl_err_vector = med_temp_vector, med_mass_vector, med_beta_vector, med_correl_err_vector
+
+
+        # Plot "median model"
+        for i in range(med_fit_dict['components']):
+            ax.plot(med_fit_wavelengths*1E6, med_fit_fluxes[i,:], ls='--', lw=1.0, c='black')
+        ax.plot(med_fit_wavelengths*1E6, med_fit_fluxes_tot, ls='-', lw=1.5, c='red')
+
+        """# Plot shaded regions
         for i in range(fit_dict['components']):
             ax.fill_between(post_wavelengths*1E6, lim_fluxes_indv[0,:,i], lim_fluxes_indv[1,:,i], facecolor='gray', edgecolor='none', linewidth=0, alpha=0.25)
-        ax.fill_between(post_wavelengths*1E6, lim_fluxes_tot[0,:,], lim_fluxes_tot[1,:], facecolor='red', edgecolor='none', linewidth=0, alpha=0.25)
+        ax.fill_between(post_wavelengths*1E6, lim_fluxes_tot[0,:,], lim_fluxes_tot[1,:], facecolor='red', edgecolor='none', linewidth=0, alpha=0.25)"""
 
 
 
@@ -1103,7 +1141,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
         mass_2_value_string = ',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=3))[0:5]
         mass_tot_value_string = ',   M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=3))[0:5]
     if (fit_dict['beta_vary'] == True) and (len(fit_dict['beta']) == 1):
-        beta_1_value_string = ',   $\\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]
+        beta_1_value_string = '$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]
     else:
         beta_1_value_string = ''
 
@@ -1132,9 +1170,6 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
     mass_tot_string = mass_tot_value_string + mass_tot_error_string + ' log$_{10}$M$_{\odot}$'
     beta_1_string = beta_1_value_string + beta_1_error_string
 
-    # Calculate chi-squared and produce corresponding string
-    chi_squared_string = '$\chi^{2}$ = '+str(np.around(np.sum(chi_squared), decimals=3))[0:5]
-
     # Place text on figure
     string_x_base = 0.015
     string_y_base = 0.945
@@ -1142,7 +1177,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans', posterior_onl
     ax.text(string_x_base, string_y_base, fit_dict['gal_dict']['name'], fontsize=15, fontweight='bold', transform=ax.transAxes, family=font_family)
     ax.text(string_x_base, string_y_base-(1*string_y_step), temp_1_string+mass_1_string, fontsize=14, transform=ax.transAxes, family=font_family)
     ax.text(string_x_base, string_y_base-(2*string_y_step), temp_2_string+mass_2_string, fontsize=14, transform=ax.transAxes, family=font_family)
-    ax.text(string_x_base, string_y_base-((fit_dict['components']+1)*string_y_step), chi_squared_string+beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
+    ax.text(string_x_base, string_y_base-((fit_dict['components']+1)*string_y_step), beta_1_string+mass_tot_string, fontsize=14, transform=ax.transAxes, family=font_family)
 
 
 
