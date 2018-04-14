@@ -215,9 +215,12 @@ def Fit(gal_dict,
             mcmc_chains = dill.load(open(os.path.join(plot,'MCMC.dj'),'rb'))
 
         # Identify and remove portions of chains exhibiting burn-in and meta-stability
-        if verbose:
-            print(name_bracket_prefix + 'Removing burn-in and metastable chains')
-        mcmc_chains_clean = ChainClean(mcmc_chains)
+        if not danger:
+            if verbose:
+                print(name_bracket_prefix + 'Removing burn-in and metastable chains')
+            mcmc_chains_clean = ChainClean(mcmc_chains)
+        else:
+            mcmc_chains_clean = mcmc_chains
 
         # Plot trace of MCMC chains
         if plot:
