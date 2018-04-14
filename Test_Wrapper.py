@@ -87,5 +87,6 @@ for g in np.random.permutation(cat_frame.index):
                              kappa_0_lambda = 500E-6,
                              mcmc_n_walkers = 12,
                              mcmc_n_steps = 50000,
-                             plot = out_dir)
+                             plot = out_dir,
+                             test = True)
 

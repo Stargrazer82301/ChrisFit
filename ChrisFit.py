@@ -25,7 +25,6 @@ import termcolor
 import acor
 import corner
 import emcee
-import pymc
 from ChrisFuncs import SigmaClip
 
 # Disable interactive plotting
@@ -52,7 +51,7 @@ def Fit(gal_dict,
         priors = None,
         mcmc_n_walkers = 250,
         mcmc_n_steps = 2500,
-        full_posterior = False,
+        full_posterior = True,
         verbose = True,
         test = False):
         """
@@ -698,7 +697,7 @@ def MCMCInitial(mle_params, fit_dict):
         while not accepted:
             accepted = True
 
-			# Permutate walker initial positions by +/- 20%, with additional +/- 0.001 random shift
+            # Permutate walker initial positions by +/- 20%, with additional +/- 0.001 random shift
             walker_scale = 0.2 * mle_params * np.random.rand(len(mle_params))
             walker_offset = 1E-3 * np.random.rand(len(mle_params))
             walker_initial = (mle_params + walker_scale + walker_offset)
