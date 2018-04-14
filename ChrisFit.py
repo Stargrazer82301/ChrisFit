@@ -1324,13 +1324,13 @@ def Autocorr(mcmc_chains, fit_dict):
                            figsize=(8,(1.5*fit_dict['n_params'])), sharex=True, squeeze=True)
 
     # Initiate record-keeping variables, and loop over parameters, then loop over chains
-    autocorr_time = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
+    #autocorr_time = np.zeros([mcmc_chains.shape[2], mcmc_chains.shape[0]])
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
             # Compute autocorrelation function and time and burn-in for chain
             autocorr_func = acor.function(mcmc_chains[j, :, i])
-            autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])[0]
+            #autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])[0]
 
             # Plot autocorrelation function and autocorrelation time
             autocorr_func_conv = scipy.ndimage.filters.gaussian_filter(autocorr_func, 10)
