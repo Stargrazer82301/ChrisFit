@@ -51,7 +51,9 @@ def Fit(gal_dict,
         priors = None,
         mcmc_n_walkers = 250,
         mcmc_n_steps = 2500,
+        mcmc_n_threads = int(round(mp.cpu_count()*1.0)),
         full_posterior = True,
+        danger = False,
         verbose = True,
         test = False):
         """
@@ -102,9 +104,21 @@ def Fit(gal_dict,
                     parameter in question (ie, temperature, mass, or beta) of the n-th model component; note
                     that the priors for any correlated uncertainty terms should be provided through the
                     correl_unc kwarg instead
+            mcmc_n_walkers:
+                    An int, stating how many emcee MCMC walkers should be used to explore the posterior; the higher the
+                    number, the less likely you are to find yourself stuck in a local minima
+            mcmc_n_steps:
+                    An integer, stating how many steps each emcee MCMC walker should take whilst exploring the
+                    posterior; the more steps, the better the likelihood of convergence and good sampling
+            mcmc_n_threads:
+                    An integer, stating how many CPU threads emcee should use for its MCMC sampling; if you have a
+                    small number of walkers, setting this to 1 might be faster
             full_posterior:
                     A boolean, stating whether the full posterior distribution of each parameter should be
                     returned, or just the summary of median, credible interval, etc
+            danger:
+                    A boolean, which if True will prioritise speed over caution (enabling the emcee live_dangerously
+                    kwarg, and scatting the initial positions of the walkers a bit less)
             verbose:
                     A boolean, stating whether ChrisFit should provide verbose output whilst operating
             test:
@@ -148,7 +162,8 @@ def Fit(gal_dict,
                     'mcmc_n_steps':mcmc_n_steps,
                     'distance':gal_dict['distance'],
                     'kappa_0':kappa_0,
-                    'kappa_0_lambda':kappa_0_lambda}
+                    'kappa_0_lambda':kappa_0_lambda,
+                    'danger':danger}
 
         # Determine number of parameters
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
@@ -176,7 +191,12 @@ def Fit(gal_dict,
             mcmc_initial = MCMCInitial(mle_params, fit_dict)
 
             # Initiate and run emcee affine-invariant ensemble sampler
-            mcmc_sampler = emcee.EnsembleSampler( mcmc_n_walkers, n_params, LnPost, args=[fit_dict], threads=int(round(mp.cpu_count()*1.0)))
+            mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers,
+                                                 n_params,
+                                                 LnPost,
+                                                 args=[fit_dict],
+                                                 threads=mcmc_n_threads,
+                                                 live_dangerously=danger)
             if verbose:
                 print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
                 mcmc_bar = progress.bar.Bar('Computing MCMC',
@@ -697,9 +717,15 @@ def MCMCInitial(mle_params, fit_dict):
         while not accepted:
             accepted = True
 
-            # Permutate walker initial positions by +/- 20%, with additional +/- 0.001 random shift
+            # Generate permutations for walker initial positions of +/- 20%, with additional +/- 0.001 random shift
             walker_scale = 0.2 * mle_params * np.random.rand(len(mle_params))
             walker_offset = 1E-3 * np.random.rand(len(mle_params))
+
+            # If you're sure that the MLE params are a solid starting point, live dangerously and scatter them less for faster convergence
+            if fit_dict['danger']:
+                walker_scale = 0.1 * mle_params * np.random.rand(len(mle_params))
+
+            # Apply initial position permutations
             walker_initial = (mle_params + walker_scale + walker_offset)
 
             # Check that temperature terms are in order
