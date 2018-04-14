@@ -6,6 +6,7 @@ import os
 import copy
 import dill
 import re
+import gc
 from difflib import SequenceMatcher
 import multiprocessing as mp
 import numpy as np
@@ -291,6 +292,8 @@ def Fit(gal_dict,
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
 
         # Return results
+        gc.collect()
+        mcmc_sampler.pool.terminate()
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
