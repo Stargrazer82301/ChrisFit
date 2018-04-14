@@ -190,7 +190,8 @@ def Fit(gal_dict,
             else:
                 mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
             mcmc_chains = mcmc_sampler.chain
-            dill.dump(mcmc_chains, open(os.path.join(plot,'MCMC.dj'),'wb'))
+            if plot:
+                dill.dump(mcmc_chains, open(os.path.join(plot,'MCMC.dj'),'wb'))
         elif test:
             mcmc_chains = dill.load(open(os.path.join(plot,'MCMC.dj'),'rb'))
 
@@ -272,6 +273,8 @@ def Fit(gal_dict,
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
             return mcmc_samples
+        else:
+            return {'medians':median_params}
 
 
 
