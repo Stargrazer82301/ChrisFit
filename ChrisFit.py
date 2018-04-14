@@ -1130,28 +1130,28 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
 
     # Construct strings containing parameter values
-    temp_1_value_string = 'T$_{c}$ = '+str(np.around(temp_vector[0], decimals=3))[0:5]
-    mass_1_value_string = ',   M$_{c}$ = '+str(np.around(np.log10(mass_vector[0]), decimals=3))[0:5]
+    temp_1_value_string = r'T$_{c}$ = '+str(np.around(temp_vector[0], decimals=3))[0:5]
+    mass_1_value_string = r',   M$_{c}$ = '+str(np.around(np.log10(mass_vector[0]), decimals=3))[0:5]
     if fit_dict['components'] == 1:
-        temp_2_value_string = ''
-        mass_2_value_string = ''
-        mass_tot_value_string = ''
+        temp_2_value_string = r''
+        mass_2_value_string = r''
+        mass_tot_value_string = r''
     elif fit_dict['components'] == 2:
-        temp_2_value_string = 'T$_{w}$ = '+str(np.around(temp_vector[1], decimals=3))[0:5]
-        mass_2_value_string = ',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=3))[0:5]
-        mass_tot_value_string = ',   M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=3))[0:5]
+        temp_2_value_string = r'T$_{w}$ = '+str(np.around(temp_vector[1], decimals=3))[0:5]
+        mass_2_value_string = r',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=3))[0:5]
+        mass_tot_value_string = r',   M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=3))[0:5]
     if (fit_dict['beta_vary'] == True) and (len(fit_dict['beta']) == 1):
-        beta_1_value_string = '$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]
+        beta_1_value_string = r'$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]
     else:
-        beta_1_value_string = ''
+        beta_1_value_string = r''
 
     # Construct strings for present uncertainties (if available)
-    temp_1_error_string = ''
-    mass_1_error_string = ''
-    temp_2_error_string = ''
-    mass_2_error_string = ''
-    mass_tot_error_string = ''
-    beta_1_error_string = ''
+    temp_1_error_string = r''
+    mass_1_error_string = r''
+    temp_2_error_string = r''
+    mass_2_error_string = r''
+    mass_tot_error_string = r''
+    beta_1_error_string = r''
     """if isinstance(params_dist, np.ndarray):
         temp_1_error_string = ' $\pm$ '+str(np.around(bs_T_c_sigma, decimals=3))[0:5]
         mass_1_error_string = ' $\pm$ '+str(np.around(bs_M_c_sigma_log, decimals=3))[0:5]
@@ -1163,11 +1163,11 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
             beta_1_error_string = ' $\pm$ '+str(np.around( bs_beta_sigma, decimals=3))[0:4]"""
 
     # Assemble combined results strings
-    temp_1_string = temp_1_value_string + temp_1_error_string + ' K'
-    mass_1_string = mass_1_value_string + mass_1_error_string + ' log$_{10}$M$_{\odot}$'
-    temp_2_string = temp_2_value_string + temp_2_error_string + ' K'
-    mass_2_string = mass_2_value_string + mass_2_error_string + ' log$_{10}$M$_{\odot}$'
-    mass_tot_string = mass_tot_value_string + mass_tot_error_string + ' log$_{10}$M$_{\odot}$'
+    temp_1_string = temp_1_value_string + temp_1_error_string + r' K'
+    mass_1_string = mass_1_value_string + mass_1_error_string + r' log$_{10}$M$_{\odot}$'
+    temp_2_string = temp_2_value_string + temp_2_error_string + r' K'
+    mass_2_string = mass_2_value_string + mass_2_error_string + r' log$_{10}$M$_{\odot}$'
+    mass_tot_string = mass_tot_value_string + mass_tot_error_string + r' log$_{10}$M$_{\odot}$'
     beta_1_string = beta_1_value_string + beta_1_error_string
 
     # Place text on figure
