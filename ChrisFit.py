@@ -211,9 +211,9 @@ def Fit(gal_dict,
                 mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
             mcmc_chains = mcmc_sampler.chain
             if plot:
-                dill.dump(mcmc_chains, open(os.path.join(plot,'MCMC.dj'),'wb'))
+                dill.dump(mcmc_chains, open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'wb'))
         elif test:
-            mcmc_chains = dill.load(open(os.path.join(plot,'MCMC.dj'),'rb'))
+            mcmc_chains = dill.load(open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'rb'))
 
         # Identify and remove portions of chains exhibiting burn-in and meta-stability
         if not danger:
