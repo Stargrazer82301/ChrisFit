@@ -1199,9 +1199,13 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Assemble combined results strings
     temp_1_string = temp_1_value_string + temp_1_error_string + r' K'
     mass_1_string = mass_1_value_string + mass_1_error_string + r' log$_{10}$M$_{\odot}$'
-    temp_2_string = temp_2_value_string + temp_2_error_string + r' K'
-    mass_2_string = mass_2_value_string + mass_2_error_string + r' log$_{10}$M$_{\odot}$'
-    mass_tot_string = mass_tot_value_string + mass_tot_error_string + r' log$_{10}$M$_{\odot}$'
+    temp_2_string = r''
+    mass_2_string = r''
+    mass_tot_string = r''
+    if fit_dict['components'] == 2:
+        temp_2_string = temp_2_value_string + temp_2_error_string + r' K'
+        mass_2_string = mass_2_value_string + mass_2_error_string + r' log$_{10}$M$_{\odot}$'
+        mass_tot_string = mass_tot_value_string + mass_tot_error_string + r' log$_{10}$M$_{\odot}$'
     beta_1_string = beta_1_value_string + beta_1_error_string
 
     # Place text on figure
