@@ -44,14 +44,14 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 out_dir = 'Output/'
 
 # List target galaxies (skipping galaxies already processed)
-target_gals = ['NGC4030','NGC4559','NGC5496','NGC5584','NGC5658','NGC5690','NGC5691','NGC5705','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09299','UGC09470','UGC09482']
+target_gals = ['NGC2974']#['NGC4030','NGC4559','NGC5496','NGC5584','NGC5658','NGC5690','NGC5691','NGC5705','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09299','UGC09470','UGC09482']
 processed_gals = set([processed_gal.split('_')[:-1][0] for processed_gal in os.listdir(out_dir) if '.png' in processed_gal])
 target_gals = list(set(target_gals) - processed_gals)
 
 # Loop over galaxies
 for g in np.random.permutation(cat_frame.index):
     cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in ['NGC5496']:
+    if cat_frame_gal['name'] not in target_gals:
         continue
     bands_frame_gal = copy.deepcopy(bands_frame)
 
@@ -72,7 +72,7 @@ for g in np.random.permutation(cat_frame.index):
             bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
 
         # Prune fluxes with major flags
-        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N']):
+        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
             bands_frame_gal.loc[b,'flux'] = np.NaN
             bands_frame_gal.loc[b,'error'] = np.NaN
 
@@ -88,5 +88,5 @@ for g in np.random.permutation(cat_frame.index):
                              mcmc_n_walkers = 12,
                              mcmc_n_steps = 50000,
                              plot = out_dir,
-                             test = True)
+                             test = False)
 
