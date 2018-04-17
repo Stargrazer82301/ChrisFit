@@ -177,6 +177,8 @@ def Fit(gal_dict,
         mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
 
         # Find Maximum Likelihood Estimate (MLE)
+        if test and os.path.exists(os.path.join(plot,gal_dict['name']+'_MCMC.dj')):
+            mcmc_chains = dill.load(open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'rb'))
         if not test:
             if verbose:
                 print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
@@ -210,10 +212,8 @@ def Fit(gal_dict,
             else:
                 mcmc_sampler.run_mcmc(mcmc_initial, mcmc_n_steps)
             mcmc_chains = mcmc_sampler.chain
-            if plot:
+            if test:
                 dill.dump(mcmc_chains, open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'wb'))
-        elif test:
-            mcmc_chains = dill.load(open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'rb'))
 
         # Identify and remove portions of chains exhibiting burn-in and meta-stability
         if not danger:
