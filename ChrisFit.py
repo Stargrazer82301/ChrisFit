@@ -174,7 +174,7 @@ def Fit(gal_dict,
         mle_fit_dict = copy.deepcopy(fit_dict)
         mle_fit_dict['bounds'] = True
         mle_fit_dict['correl_unc'] = False
-        mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)#(20.0, 50.0, 5E-9*fit_dict['distance']**2.0, 5E-12*fit_dict['distance']**2.0, 2.0, 2.0, 0.0)
+        mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)
 
         # Find Maximum Likelihood Estimate (MLE)
         if test and os.path.exists(os.path.join(plot,gal_dict['name']+'_MCMC.dj')):
@@ -328,7 +328,7 @@ def LnLike(params, fit_dict):
     bands_flux_pred = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
                                 kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
 
-    # Caclculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
+    # Calculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
     bands_instr = [band.split('_')[0] for band in bands_frame['band']]
     bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_instr, temp_vector, mass_vector, beta_vector,
                                       kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
@@ -491,7 +491,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     if np.std([len(temp), len(mass), len(beta), len(kappa_0), len(kappa_0_lambda)]) != 0:
         Exception('Number of dust components needs to be identical for temp/mass/beta/kappa_0/kappa_0_lambda variables')
 
-    """ NB: Arrays have dimensons of n_comp rows by n_bands columns """
+    """ NB: Arrays have dimensions of n_comp rows by n_bands columns """
 
     # Convert wavelengths to frequencies (for bands of interest, and for kappa_0 reference wavelengths)
     nu = np.divide(c, wavelength)
@@ -502,7 +502,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     kappa_nu_prefactor = np.array([ np.power(kappa_nu_base[m,:],beta[m]) for m in range(n_comp) ]) # This expontiates each model component's base term to its corresponding beta
     kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
 
-    # Caclulate Planck function prefactor for each frequency
+    # Calculate Planck function prefactor for each frequency
     B_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
 
     # Calculate exponent term in Planck function, for each component, at each frequency
@@ -511,7 +511,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     # Calculate final value of Planck function for each, for each model component, at each frequency (output array will have n_comp rows, and n_freq columns)
     B_planck = B_prefactor * (np.e**B_exponent - 1)**-1.0
 
-    # Convert mass and distance values to SI unuts
+    # Convert mass and distance values to SI units
     mass_kilograms = mass * 2E30
     dist_metres = dist * 3.26 * 9.5E15
 
@@ -531,10 +531,10 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
 
 def PriorsConstruct(fit_dict):
-    """ Function to auitomatically construct a set of default priors, given the basic parameters of the model as
+    """ Function to automatically construct a set of default priors, given the basic parameters of the model as
     described by the ChrisFit input """
 
-    # Initialise dictionary to hold priors
+    # Initialize dictionary to hold priors
     priors = {'temp':[],
               'mass':[],
               'beta':[]}
