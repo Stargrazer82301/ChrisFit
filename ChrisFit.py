@@ -553,7 +553,7 @@ def PriorsConstruct(fit_dict):
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
     bands_frame = fit_dict['bands_frame']
-    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    peak_flux = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
     peak_lum = peak_flux * fit_dict['distance']**2.0
     peak_mass = 10**(np.log10(peak_lum)-8)
 
@@ -684,7 +684,7 @@ def MaxLikeInitial(bands_frame, fit_dict):
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
     bands_frame = fit_dict['bands_frame']
-    peak_flux = bands_frame.where((bands_frame['wavelength']>=200E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    peak_flux = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
     peak_lum = peak_flux * fit_dict['distance']**2.0
     peak_mass = 10**(np.log10(peak_lum)-8)
 
