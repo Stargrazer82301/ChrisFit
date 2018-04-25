@@ -299,7 +299,7 @@ def Fit(gal_dict,
         if full_posterior:
             return mcmc_samples
         else:
-            return {'medians':median_params}
+            return {'medians':median_params,'mle':mle_params}
 
 
 
