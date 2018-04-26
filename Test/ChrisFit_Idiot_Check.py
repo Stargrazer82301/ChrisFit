@@ -32,9 +32,9 @@ import ChrisFit
 cat_frame = pd.read_csv('DustPedia_Combined_Photometry_2.2.csv')
 
 # Create dataframe storing basic band information
-bands_frame = pd.DataFrame({'band':         ['Spitzer_24','PACS_70','PACS_100','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500'],
-                            'wavelength':   np.array([24E-6, 70E-6, 100E-6,160E-6, 250E-6, 350E-6, 350E-6, 500E-6]),
-                            'limit':        [True, False, False, False, False, False, False, False]})
+bands_frame = pd.DataFrame({'band':         ['Spitzer_24','SOPHIA_53','IRAS_60','PACS_70','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500'],
+                            'wavelength':   np.array([24E-6, 53E-6, 60E-6, 70E-6, 100E-6,160E-6, 250E-6, 350E-6, 500E-6]),
+                            'limit':        [True, True, False, False, False, False, False, False, False]})
 
 # Construct function for SPIRE correlated uncertainty
 def SpireCorrelUnc(prop, unc=0.04):
