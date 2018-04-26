@@ -1393,3 +1393,51 @@ def TracePlot(mcmc_chains, fit_dict):
     fig.tight_layout()
     fig.subplots_adjust(hspace=0)
     return fig, ax
+
+
+"""
+# Code snippet that plots priors (when pasted into PriorsConstruct)
+sns.set(context='talk')
+sns.set_style('darkgrid')
+
+fig = plt.figure(figsize=(6,4))
+ax = fig.add_axes([0.175, 0.175, 0.75, 0.75])
+x = np.linspace(0,100,5000)
+y = priors['temp'][0](x)
+y -= y[np.where(y>-np.inf)].min() - 1.0
+y *= y[np.where(y>-np.inf)].max()**-1.0
+ax.plot(x, 10.0**y, ls='-', lw=2.0, c='#31D18B')
+y = priors['temp'][1](x)
+y -= y[np.where(y>-np.inf)].min() - 1.0
+y *= y[np.where(y>-np.inf)].max()**-1.0
+ax.plot(x, 10.0**y, ls='-', lw=2.0, c='#F49D06')
+ax.set_xlabel(r'Temperature (K)', fontsize=15)
+ax.set_ylabel(r'${\it ln}$-likelihood', fontsize=15)
+fig.savefig('/home/herdata/spx7cjc/Dropbox/Work/Scripts/ChrisFit/Test/Temp_Priors.png', dpi=150)
+
+fig = plt.figure(figsize=(6,4))
+ax = fig.add_axes([0.175, 0.175, 0.75, 0.75])
+x = np.linspace(0,10,5000)
+y = priors['mass'][0](10**x)
+y -= y[np.where(y>-np.inf)].min() - 1.0
+y *= y[np.where(y>-np.inf)].max()**-1.0
+ax.plot(x, 10.0**y, ls='-', lw=2.0, c='#31D18B')
+y = priors['mass'][1](10**x)
+y -= y[np.where(y>-np.inf)].min() - 1.0
+y *= y[np.where(y>-np.inf)].max()**-1.0
+ax.plot(x, 10.0**y, ls='-', lw=2.0, c='#F49D06')
+ax.set_xlabel(r'Mass (${\rm log}_{10}({\rm M_{\odot}})$)', fontsize=15)
+ax.set_ylabel(r'${\it ln}$-likelihood', fontsize=15)
+fig.savefig('/home/herdata/spx7cjc/Dropbox/Work/Scripts/ChrisFit/Test/Mass_Priors.png', dpi=150)
+
+fig = plt.figure(figsize=(6,4))
+ax = fig.add_axes([0.175, 0.175, 0.75, 0.75])
+x = np.linspace(0,5,5000)
+y = priors['beta'][0](x)
+y -= y[np.where(y>-np.inf)].min() - 1.0
+y *= y[np.where(y>-np.inf)].max()**-1.0
+ax.plot(x, 10.0**y, ls='-', lw=2.0, c='#CC0B55')
+ax.set_xlabel(r'$\beta$', fontsize=15)
+ax.set_ylabel(r'${\it ln}$-likelihood', fontsize=15)
+fig.savefig('/home/herdata/spx7cjc/Dropbox/Work/Scripts/ChrisFit/Test/Beta_Prior.png', dpi=150)
+"""
