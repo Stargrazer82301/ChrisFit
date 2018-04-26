@@ -79,20 +79,25 @@ inject_err = np.sqrt(obs_err**2.0 + calib_unc**2.0)
 
 # Use uncertainties to produce noisy fluxes with errors (with  extra emission added to bands that are just upper limits)
 bands_frame['flux'] = inject_flux + (np.random.normal(loc=0.0, scale=inject_err) * inject_flux)
-bands_frame['flux'] *= (1.0 + (bands_frame['limit'].values.astype(float) * np.abs(np.random.normal())))
+bands_frame['flux'] *= 10.0**(bands_frame['limit'].values.astype(float) * np.abs(1.0+np.random.normal()))
 bands_frame['error'] = bands_frame['flux'] * inject_err
 
+# Limit bands frame to the specific bands that are actually wanted for this run
+bands_use = ['Spitzer_24','IRAS_60','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500']
+bands_frame = bands_frame.loc[np.where(np.in1d(bands_frame['band'],bands_use))]
+
 # Call ChrisFit
-posterior = ChrisFit.Fit(gal_dict,
-                         bands_frame,
-                         correl_unc = correl_unc,
-                         beta_vary = True,
-                         beta = 2.0,
-                         components = 1,
-                         kappa_0 = 0.051,
-                         kappa_0_lambda = 500E-6,
-                         mcmc_n_walkers = 12,
-                         mcmc_n_steps = 10000,
-                         plot = '',#os.path.join(dropbox,'Work'),
-                         test = False)
+output = ChrisFit.Fit(gal_dict,
+                      bands_frame,
+                      correl_unc = correl_unc,
+                      beta_vary = True,
+                      beta = 2.0,
+                      components = 2,
+                      kappa_0 = 0.051,
+                      kappa_0_lambda = 500E-6,
+                      mcmc_n_walkers = 12,
+                      mcmc_n_steps = 100000,
+                      plot = 'Output/',
+                      test = False,
+                      priors = None)
 
