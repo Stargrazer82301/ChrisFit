@@ -235,18 +235,6 @@ def Fit(gal_dict,
                 if os.path.exists(plot):
                     trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
 
-        # Plot autocorrelation of MCMC chains
-        if plot:
-            if verbose:
-                print(name_bracket_prefix + 'Generating autocorrelation plot')
-        autocorr_fig, autocorr_ax = Autocorr(mcmc_chains, fit_dict)
-        if plot == True:
-            autocorr_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    autocorr_fig.savefig(os.path.join(plot,gal_dict['name']+'_Autocorrelation.png'), dpi=150)
-
         # Combine MCMC chains into final posteriors for each parameter, excludig any samples that contain NaNs
         mcmc_samples = mcmc_chains_clean.reshape((-1, n_params))
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
