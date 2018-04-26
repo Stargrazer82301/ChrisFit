@@ -57,25 +57,52 @@ out_dir = '/Output'
 
 # Create input dictionary for this "galaxy"
 gal_dict = {'name':'Test',
-            'distance':10E6,
-            'redshift':0.0025}
+            'distance':30E6,
+            'redshift':0.00475}
+
+# Construct temperature prior
+def TempPrior(temp):
+    if (temp <= 10) or (temp > 100):
+        return -np.inf
+    else:
+        return 0
+
+# Construct temperature prior
+def MassPrior(mass):
+    if (mass <= 0) or (mass > 1E15):
+        return -np.inf
+    else:
+        return 0
+
+# Construct beta prior
+def BetaPrior(beta):
+    if (beta <= 0) or (beta > 5):
+        return -np.inf
+    else:
+        return 0
+
+# Construct flat priors
+priors = {'temp':[copy.deepcopy(TempPrior), copy.deepcopy(TempPrior)],
+          'mass':[copy.deepcopy(MassPrior), copy.deepcopy(MassPrior)],
+          'beta':[copy.deepcopy(BetaPrior)]}
+
+# Use calibration and observational uncertainties to generate artificial errors
+calib_unc = np.array([0.05, 0.05, 0.2, 0.07, 0.07, 0.07, 0.055, 0.055, 0.055])
+obs_err = np.array([0.07, 0.15, 0.05, 0.05, 0.07, 0.05, 0.03, 0.03, 0.06])
+inject_err = np.sqrt(obs_err**2.0 + calib_unc**2.0)
 
 # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
 bands_frame['flux'] = pd.Series(np.array([len(bands_frame)*np.NaN]), index=bands_frame.index)
 bands_frame['error'] = pd.Series(np.array([len(bands_frame)*np.NaN]), index=bands_frame.index)
 
 # Decide underlying properties of source
-inject_temp = [24.0]#[26.0, 51.0]
-inject_mass = [10.0**5.5]#[10.0**6.5, 10.0**3.0]
-inject_beta = 2.1
+inject_temp = [21.7, 64.2]#[22.7]
+inject_mass = [3.16E8, 1E6]
+inject_beta = [1.9]
+inject_params = inject_temp+inject_mass+inject_beta
 
 # Generate artificial fluxes
 inject_flux = ChrisFit.ModelFlux(bands_frame['wavelength'], inject_temp, inject_mass, gal_dict['distance'], kappa_0=0.051, kappa_0_lambda=500E-6, beta=inject_beta)
-
-# Use calibration and observational uncertainties to generate artificial errors
-obs_err = np.array([0.1, 0.2, 0.2, 0.15, 0.1, 0.3, 0.15, 0.15])
-calib_unc = np.array([0.05, 0.07, 0.07, 0.07, 0.055, 0.055, 0.064, 0.055])
-inject_err = np.sqrt(obs_err**2.0 + calib_unc**2.0)
 
 # Use uncertainties to produce noisy fluxes with errors (with  extra emission added to bands that are just upper limits)
 bands_frame['flux'] = inject_flux + (np.random.normal(loc=0.0, scale=inject_err) * inject_flux)
