@@ -26,7 +26,6 @@ import termcolor
 import acor
 import corner
 import emcee
-from ChrisFuncs import SigmaClip
 
 # Disable interactive plotting
 plt.ioff()
@@ -827,9 +826,9 @@ def ChainClean(mcmc_chains):
             # Subtract median of each set of bootstrapped values from themselves (ie, find deviations from the median of each set of medians)
             comp_medians_bs_dev = comp_medians_bs - np.array([np.median(comp_medians_bs, axis=1)]*comp_medians_bs.shape[1]).transpose()
 
-            # Find the RMS deviation within each bootstrapped set of deviations, and use thrice this as the rejection threshold
+            # Find the RMS deviation within each bootstrapped set of deviations, and use this to inform the rejection threshold
             comp_medians_bs_rms = np.mean(np.abs(comp_medians_bs_dev), axis=1)
-            comp_medians_bs_thresh = 2.0 * np.median(comp_medians_bs_rms)
+            comp_medians_bs_thresh = 1.0 * np.median(comp_medians_bs_rms)
 
             # If median temp of current chain section is more than the determined threshold, call it metastable
             if abs(test_median - comp_medians_median) > comp_medians_bs_thresh:
