@@ -693,6 +693,11 @@ def MaxLikeInitial(bands_frame, fit_dict):
 def MCMCInitial(mle_params, fit_dict):
     """ Function to generate initial positions for MCMC walkers, in cluster around maximum likelihood estimate """
 
+    # Extract parameter vectors, and shunt masses into log space for the purposes of peturbing starting positions
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(mle_params, fit_dict)
+    mass_vector = np.log10(mass_vector)
+    params = np.array(tuple(temp_vector) + tuple(mass_vector) + tuple(beta_vector) + tuple(correl_err_vector))
+
     # Loop over walkers
     mcmc_initial = []
     for i in range(fit_dict['mcmc_n_walkers']):
@@ -703,15 +708,15 @@ def MCMCInitial(mle_params, fit_dict):
             accepted = True
 
             # Generate permutations for walker initial positions of +/- 20%, with additional +/- 0.001 random shift
-            walker_scale = 0.2 * mle_params * np.random.rand(len(mle_params))
-            walker_offset = 1E-3 * np.random.rand(len(mle_params))
+            walker_scale = 0.1 * params * np.random.rand(len(params))
+            walker_offset = 1E-3 * np.random.rand(len(params))
 
             # If you're sure that the MLE params are a solid starting point, live dangerously and scatter them less for faster convergence
             if fit_dict['danger']:
-                walker_scale = 0.1 * mle_params * np.random.rand(len(mle_params))
+                walker_scale = 0.1 * params * np.random.rand(len(params))
 
             # Apply initial position permutations
-            walker_initial = (mle_params + walker_scale + walker_offset)
+            walker_initial = (params + walker_scale + walker_offset)
 
             # Check that temperature terms are in order
             temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(walker_initial, fit_dict)
@@ -723,15 +728,18 @@ def MCMCInitial(mle_params, fit_dict):
             if np.where(np.array(temp_vector)<=0)[0].size > 0:
                 accepted = False
 
-            # Check that mass terms are all physical (ie, mass > 0 Msol)
+            # Check that mass terms are all physical (ie, mass > 0 Msol); if so, convert back to linar space
             if np.where(np.array(mass_vector)<0)[0].size > 0:
                 accepted = False
+            else:
+                mass_vector = 10**np.array(mass_vector)
 
             # Check that beta terms are all physical (ie, beta > 0)
             if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
                 accepted = False
 
         # If proposed position is valid, add it to list of initial conditions
+        walker_initial = tuple(temp_vector) + tuple(mass_vector) + tuple(beta_vector) + tuple(correl_err_vector)
         mcmc_initial.append(walker_initial)
 
     # Return generated initial positions
@@ -1314,7 +1322,8 @@ def Autocorr(mcmc_chains, fit_dict):
     for i in range(mcmc_chains.shape[2]):
         for j in range(mcmc_chains.shape[0]):
 
-            # Compute autocorrelation function and time and burn-in for chain
+            # Compute autocorrelation function and time and burn-in for chains
+            print ('##### CHANGE THIS TO EMCEE\'S BUILT-IN AUTOCORRELATION FUNCTION, AS IT WORKS IN PYTHON 2 & 3 #####')
             autocorr_func = acor.function(mcmc_chains[j, :, i])
             #autocorr_time[i,j] = acor.acor(mcmc_chains[j, :, i])[0]
 
