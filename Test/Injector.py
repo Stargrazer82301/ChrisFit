@@ -97,7 +97,7 @@ bands_frame['error'] = pd.Series(np.array([len(bands_frame)*np.NaN]), index=band
 
 # Decide underlying properties of source
 inject_temp = [21.7, 64.2]#[22.7]
-inject_mass = [3.16E8, 1E6]
+inject_mass = [10.0**8.5, 10.0**6.0]
 inject_beta = [1.9]
 inject_params = inject_temp+inject_mass+inject_beta
 
@@ -106,11 +106,11 @@ inject_flux = ChrisFit.ModelFlux(bands_frame['wavelength'], inject_temp, inject_
 
 # Use uncertainties to produce noisy fluxes with errors (with  extra emission added to bands that are just upper limits)
 bands_frame['flux'] = inject_flux + (np.random.normal(loc=0.0, scale=inject_err) * inject_flux)
-bands_frame['flux'] *= 10.0**(bands_frame['limit'].values.astype(float) * np.abs(1.0+np.random.normal()))
+bands_frame['flux'] *= 10.0**(bands_frame['limit'].values.astype(float) * np.abs(np.random.normal()))
 bands_frame['error'] = bands_frame['flux'] * inject_err
 
 # Limit bands frame to the specific bands that are actually wanted for this run
-bands_use = ['Spitzer_24','IRAS_60','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500']
+bands_use = ['Spitzer_24','PACS_70','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500']
 bands_frame = bands_frame.loc[np.where(np.in1d(bands_frame['band'],bands_use))]
 
 # Call ChrisFit
@@ -123,8 +123,10 @@ output = ChrisFit.Fit(gal_dict,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
                       mcmc_n_walkers = 12,
-                      mcmc_n_steps = 100000,
+                      mcmc_n_steps = 25000,
                       plot = 'Output/',
                       test = False,
-                      priors = None)
+                      priors = priors)
 
+# Jubilate
+print('All done!')
