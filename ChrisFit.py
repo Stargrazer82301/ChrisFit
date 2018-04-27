@@ -693,10 +693,8 @@ def MaxLikeInitial(bands_frame, fit_dict):
 def MCMCInitial(mle_params, fit_dict):
     """ Function to generate initial positions for MCMC walkers, in cluster around maximum likelihood estimate """
 
-    # Extract parameter vectors, and shunt masses into log space for the purposes of peturbing starting positions
-    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(mle_params, fit_dict)
-    mass_vector = np.log10(mass_vector)
-    params = np.array(tuple(temp_vector) + tuple(mass_vector) + tuple(beta_vector) + tuple(correl_err_vector))
+    # Extract parameter vectors
+    mle_temp_vector, mle_mass_vector, mle_beta_vector, mle_correl_err_vector = ParamsExtract(mle_params, fit_dict)
 
     # Loop over walkers
     mcmc_initial = []
@@ -707,13 +705,13 @@ def MCMCInitial(mle_params, fit_dict):
         while not accepted:
             accepted = True
 
-            # Generate permutations for walker initial positions of +/- 20%, with additional +/- 0.001 random shift
-            walker_scale = 0.1 * params * np.random.rand(len(params))
-            walker_offset = 1E-3 * np.random.rand(len(params))
+            # Create copy of MLE params for this iteration, and shut masses into log space for peterubations
+            params = copy.deepcopy(mle_params)
+            params[len(mle_temp_vector):len(mle_temp_vector+mle_mass_vector)] = np.log10(params[len(mle_temp_vector):len(mle_temp_vector+mle_mass_vector)])
 
-            # If you're sure that the MLE params are a solid starting point, live dangerously and scatter them less for faster convergence
-            if fit_dict['danger']:
-                walker_scale = 0.1 * params * np.random.rand(len(params))
+            # Generate permutations for walker initial positions of +/- 20%, with additional +/- 0.001 random shift
+            walker_scale = 0.05 * params * np.random.rand(len(params))
+            walker_offset = 1E-3 * np.random.rand(len(params))
 
             # Apply initial position permutations
             walker_initial = (params + walker_scale + walker_offset)
@@ -732,14 +730,13 @@ def MCMCInitial(mle_params, fit_dict):
             if np.where(np.array(mass_vector)<0)[0].size > 0:
                 accepted = False
             else:
-                mass_vector = 10**np.array(mass_vector)
+                walker_initial[len(temp_vector):len(temp_vector+mass_vector)] = 10**walker_initial[len(temp_vector):len(temp_vector+mass_vector)]
 
             # Check that beta terms are all physical (ie, beta > 0)
             if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
                 accepted = False
 
         # If proposed position is valid, add it to list of initial conditions
-        walker_initial = tuple(temp_vector) + tuple(mass_vector) + tuple(beta_vector) + tuple(correl_err_vector)
         mcmc_initial.append(walker_initial)
 
     # Return generated initial positions
