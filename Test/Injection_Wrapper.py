@@ -9,26 +9,21 @@ if location in ['saruman','rosemary-pc']:
     dropbox = '/home/user/spx7cjc/Desktop/Herdata/Dropbox/'
 
 # Import smorgasbord
-import pdb
 import os
 import sys
 import copy
-import time
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
 import scipy.stats
 import scipy.ndimage
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 sys.path.append(os.path.join(dropbox,'Work','Scripts','ChrisFit'))
 import ChrisFit
 
 
 
-# Read DustPedia photometry catalogue into dataframe
+# Read DustPedia photometry catalogue as dataframe
 cat_frame = pd.read_csv('DustPedia_Combined_Photometry_2.2.csv')
 
 # Create dataframe storing basic band information
@@ -60,21 +55,17 @@ gal_dict = {'name':'Test',
             'distance':30E6,
             'redshift':0.00475}
 
-# Construct flat temperature prior
+# Construct flat temperature, mass, and beta priors
 def TempPrior(temp):
     if (temp <= 10) or (temp > 100):
         return -np.inf
     else:
         return 0
-
-# Construct flat temperature prior
 def MassPrior(mass):
     if (mass <= 0) or (mass > 1E15):
         return -np.inf
     else:
         return 0
-
-# Construct flat beta prior
 def BetaPrior(beta):
     if (beta <= 0) or (beta > 5):
         return -np.inf
@@ -88,7 +79,7 @@ priors = {'temp':[copy.deepcopy(TempPrior), copy.deepcopy(TempPrior)],
 
 # Use calibration and observational uncertainties to generate artificial errors
 calib_unc = np.array([0.05, 0.05, 0.2, 0.07, 0.07, 0.07, 0.055, 0.055, 0.055])
-obs_err = np.array([0.07, 0.15, 0.05, 0.05, 0.07, 0.05, 0.03, 0.03, 0.06])
+obs_err = 2.0 * np.array([0.07, 0.15, 0.05, 0.05, 0.07, 0.05, 0.03, 0.03, 0.06])
 inject_err = np.sqrt(obs_err**2.0 + calib_unc**2.0)
 
 # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
@@ -106,7 +97,7 @@ inject_flux = ChrisFit.ModelFlux(bands_frame['wavelength'], inject_temp, inject_
 
 # Use uncertainties to produce noisy fluxes with errors (with  extra emission added to bands that are just upper limits)
 bands_frame['flux'] = inject_flux + (np.random.normal(loc=0.0, scale=inject_err) * inject_flux)
-bands_frame['flux'] *= 10.0**(bands_frame['limit'].values.astype(float) * np.abs(np.random.normal()))
+bands_frame['flux'] *= 10.0**(bands_frame['limit'].values.astype(float) * np.abs(np.random.normal(scale=0.3)))
 bands_frame['error'] = bands_frame['flux'] * inject_err
 
 # Limit bands frame to the specific bands that are actually wanted for this run
@@ -122,11 +113,11 @@ output = ChrisFit.Fit(gal_dict,
                       components = 2,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
-                      mcmc_n_walkers = 12,
-                      mcmc_n_steps = 25000,
+                      mcmc_n_walkers = 20,#20
+                      mcmc_n_steps = 30000,#40000
                       plot = 'Output/',
                       test = False,
-                      priors = priors)
+                      priors = None)
 
 # Jubilate
 print('All done!')

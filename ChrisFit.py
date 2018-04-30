@@ -812,16 +812,17 @@ def ChainClean(mcmc_chains):
         mcmc_chains[i,:burnin,:] = np.nan
 
     # Loop over chains and parameters, to check for metatstability
+    end_frac = 0.4
     bad_chains = np.array([False]*mcmc_chains.shape[0])
     for i in range(mcmc_chains.shape[0]):
         for j in range(mcmc_chains.shape[2]):
 
-            # To check for metastability, first compute the median values of the final 25% of each chain
+            # To check for metastability, first compute the median values of the final portion of each chain
             test_chain = mcmc_chains[i,-int(0.25*mcmc_chains.shape[1]):,j]
             test_median = np.median(test_chain)
             comp_indices = np.array(range(mcmc_chains.shape[0]))
             comp_indices = comp_indices[np.where(comp_indices!=i)]
-            comp_chains = mcmc_chains[comp_indices,-int(0.25*mcmc_chains.shape[1]):,j]
+            comp_chains = mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j]
             comp_medians = np.median(comp_chains, axis=1)
             comp_medians_median = np.median(comp_medians)
 
@@ -840,7 +841,7 @@ def ChainClean(mcmc_chains):
                 bad_chains[i] = True
 
     # Also, access which chains have end regions with low variation (likely due to high rejection rates)
-    comp_stds = np.nanstd(mcmc_chains[comp_indices,-int(0.25*mcmc_chains.shape[1]):,j], axis=1)
+    comp_stds = np.nanstd(mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j], axis=1)
     comp_stds_std = np.nanstd(comp_stds)
     comp_stds_mean = np.nanmean(comp_stds)
     comp_stds_thresh = 2.0 * comp_stds_std
