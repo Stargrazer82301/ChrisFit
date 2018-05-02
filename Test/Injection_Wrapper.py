@@ -108,13 +108,13 @@ bands_frame = bands_frame.loc[np.where(np.in1d(bands_frame['band'],bands_use))]
 output = ChrisFit.Fit(gal_dict,
                       bands_frame,
                       correl_unc = correl_unc,
-                      beta_vary = True,
+                      beta_vary = False,
                       beta = 2.0,
-                      components = 2,
+                      components = 1,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
                       mcmc_n_walkers = 20,#20
-                      mcmc_n_steps = 30000,#40000
+                      mcmc_n_steps = 25000,#40000
                       plot = 'Output/',
                       test = False,
                       priors = None)

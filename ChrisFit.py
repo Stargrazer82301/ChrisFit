@@ -62,7 +62,7 @@ def Fit(gal_dict,
         Arguments:
             gal_dict:
                     A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
-                    values for the target source in  question
+                    values for the target source in question
             bands_frame:
                     A dataframe, with columns called 'band', 'wavelength, 'flux', 'error', and 'limit' providing the
                     relevant values for each band for the target source in question
@@ -268,7 +268,8 @@ def Fit(gal_dict,
 
         # Return results
         gc.collect()
-        mcmc_sampler.pool.terminate()
+        if mcmc_n_threads > 1:
+            mcmc_sampler.pool.terminate()
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
