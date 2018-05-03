@@ -21,8 +21,6 @@ import pandas as pd
 sys.path.append(os.path.join(dropbox,'Work','Scripts','ChrisFit'))
 import ChrisFit
 
-
-
 # Read DustPedia photometry catalogue as dataframe
 cat_frame = pd.read_csv('DustPedia_Combined_Photometry_2.2.csv')
 
@@ -108,13 +106,13 @@ bands_frame = bands_frame.loc[np.where(np.in1d(bands_frame['band'],bands_use))]
 output = ChrisFit.Fit(gal_dict,
                       bands_frame,
                       correl_unc = correl_unc,
-                      beta_vary = False,
+                      beta_vary = True,
                       beta = 2.0,
                       components = 1,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
-                      mcmc_n_walkers = 20,#20
-                      mcmc_n_steps = 25000,#40000
+                      mcmc_n_walkers = 8,#20
+                      mcmc_n_steps = 10000,#40000
                       plot = 'Output/',
                       test = False,
                       priors = None)

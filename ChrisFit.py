@@ -7,6 +7,8 @@ import copy
 import dill
 import re
 import gc
+import warnings
+warnings.filterwarnings('ignore')
 from difflib import SequenceMatcher
 import multiprocessing as mp
 import numpy as np
