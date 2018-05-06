@@ -1279,7 +1279,7 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
 
     # Plot posterior corner diagrams (with histograms hidden)
     try:
-        fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84], range=[0.999]*len(labels),
+        fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84], range=[0.995]*len(labels),
                             show_titles=True, truths=params_highlight, hist_kwargs={'edgecolor':'none'})
     except:
         fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84],
@@ -1423,6 +1423,7 @@ def TracePlot(mcmc_chains, fit_dict):
         # Format axis
         ax[i].set_ylabel(labels[i])
         ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6, min_n_ticks=5, prune='both'))
+        ax[i].set_ylim(np.nanpercentile(mcmc_chains[:, :, i], 1), np.nanpercentile(mcmc_chains[:, :, i], 99))
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('MCMC Step')
