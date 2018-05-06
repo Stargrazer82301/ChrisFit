@@ -54,6 +54,7 @@ def Fit(gal_dict,
         mcmc_n_walkers = 250,
         mcmc_n_steps = 2500,
         mcmc_n_threads = int(round(mp.cpu_count()*1.0)),
+        simple_clean = False,
         full_posterior = True,
         danger = False,
         verbose = True,
@@ -115,6 +116,12 @@ def Fit(gal_dict,
             mcmc_n_threads:
                     An integer, stating how many CPU threads emcee should use for its MCMC sampling; if you have a
                     small number of walkers, setting this to 1 might be faster
+            simple_clean:
+                    A boolean or float, descrbing the type of chain cleaning to be performed. If False, a full cleaning
+                    will be performed, with convergance diagnostics to remove burn-in, metastability analysis to exclude
+                    bad chains. If a float in the range 0-1 is given, then all that is done is that fraction of the
+                    all is removed as burn-in; if you have enough of walkers (ie, hundreds) and steps (ie, thousands),
+                    then using this simple option and removing the first 50% all chains should
             full_posterior:
                     A boolean, stating whether the full posterior distribution of each parameter should be
                     returned, or just the summary of median, credible interval, etc
@@ -220,7 +227,7 @@ def Fit(gal_dict,
         if not danger:
             if verbose:
                 print(name_bracket_prefix + 'Removing burn-in and metastable chains')
-            mcmc_chains_clean = ChainClean(mcmc_chains)
+            mcmc_chains_clean = ChainClean(mcmc_chains, simple_clean=simple_clean)
         else:
             mcmc_chains_clean = mcmc_chains
 
@@ -278,7 +285,6 @@ def Fit(gal_dict,
             return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params}
         else:
             return {'medians':median_params,'mle':mle_params}
-
 
 
 
@@ -791,80 +797,87 @@ def MaxLikeBounds(params, fit_dict):
 
 
 
-def ChainClean(mcmc_chains):
+def ChainClean(mcmc_chains, simple_clean=False):
     """ Function to identify and remove chains, and portions of chains, exhibiting non-convergence """
 
-    # Create copy of chains to work with
-    mcmc_chains = mcmc_chains.copy()
+    # If we're doing this the simple way, just lop some fraction off the start of every chain
+    if (simple_clean != False) and (isinstance(simple_clean, float)):
+        burnin =int(simple_clean * mcmc_chains.shape[1])
+        mcmc_chains[:,:burnin,:] = np.nan
+        return mcmc_chains
+    else:
 
-    # Loop over chains and parameters, to find Geweke z-score for each
-    for i in range(mcmc_chains.shape[0]):
-        burnin = int(0.05 * mcmc_chains.shape[2])
-        for j in range(mcmc_chains.shape[2]):
-            geweke = Geweke(mcmc_chains[i,:,j])
+        # Create copy of chains to work with
+        mcmc_chains = mcmc_chains.copy()
 
-            # Find where Geweke score crosses 0 for first time; assume this represents burn-in
-            if (np.min(geweke[:,1]) >= 0) or (np.max(geweke[:,1]) <= 0):
-                burnin = mcmc_chains.shape[1]
-            elif geweke[0,1] > 0:
-                burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]<0)[0].min(), 0]))
-            elif geweke[0,1] < 0:
-                burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]>0)[0].min(), 0]))
+        # Loop over chains and parameters, to find Geweke z-score for each
+        for i in range(mcmc_chains.shape[0]):
+            burnin = int(0.05 * mcmc_chains.shape[2])
+            for j in range(mcmc_chains.shape[2]):
+                geweke = Geweke(mcmc_chains[i,:,j])
 
-        # Set burn-in steps to be NaN
-        mcmc_chains[i,:burnin,:] = np.nan
+                # Find where Geweke score crosses 0 for first time; assume this represents burn-in
+                if (np.min(geweke[:,1]) >= 0) or (np.max(geweke[:,1]) <= 0):
+                    burnin = mcmc_chains.shape[1]
+                elif geweke[0,1] > 0:
+                    burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]<0)[0].min(), 0]))
+                elif geweke[0,1] < 0:
+                    burnin = max(burnin, int(2.0 * geweke[np.where(geweke[:,1]>0)[0].min(), 0]))
 
-    # Loop over chains and parameters, to check for metatstability
-    end_frac = 0.4
-    bad_chains = np.array([False]*mcmc_chains.shape[0])
-    for i in range(mcmc_chains.shape[0]):
-        for j in range(mcmc_chains.shape[2]):
+            # Set burn-in steps to be NaN
+            mcmc_chains[i,:burnin,:] = np.nan
 
-            # To check for metastability, first compute the median values of the final portion of each chain
-            test_chain = mcmc_chains[i,-int(0.25*mcmc_chains.shape[1]):,j]
-            test_median = np.median(test_chain)
-            comp_indices = np.array(range(mcmc_chains.shape[0]))
-            comp_indices = comp_indices[np.where(comp_indices!=i)]
-            comp_chains = mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j]
-            comp_medians = np.median(comp_chains, axis=1)
-            comp_medians_median = np.median(comp_medians)
+        # Loop over chains and parameters, to check for metatstability
+        end_frac = 0.4
+        bad_chains = np.array([False]*mcmc_chains.shape[0])
+        for i in range(mcmc_chains.shape[0]):
+            for j in range(mcmc_chains.shape[2]):
 
-            # Perform nonparametric bootstrap resample of medians
-            comp_medians_bs = np.array([sklearn.utils.resample(comp_medians) for k in range(10000)])
+                # To check for metastability, first compute the median values of the final portion of each chain
+                test_chain = mcmc_chains[i,-int(0.25*mcmc_chains.shape[1]):,j]
+                test_median = np.median(test_chain)
+                comp_indices = np.array(range(mcmc_chains.shape[0]))
+                comp_indices = comp_indices[np.where(comp_indices!=i)]
+                comp_chains = mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j]
+                comp_medians = np.median(comp_chains, axis=1)
+                comp_medians_median = np.median(comp_medians)
 
-            # Subtract median of each set of bootstrapped values from themselves (ie, find deviations from the median of each set of medians)
-            comp_medians_bs_dev = comp_medians_bs - np.array([np.median(comp_medians_bs, axis=1)]*comp_medians_bs.shape[1]).transpose()
+                # Perform nonparametric bootstrap resample of medians
+                comp_medians_bs = np.array([sklearn.utils.resample(comp_medians) for k in range(10000)])
 
-            # Find the RMS deviation within each bootstrapped set of deviations, and use this to inform the rejection threshold
-            comp_medians_bs_rms = np.mean(np.abs(comp_medians_bs_dev), axis=1)
-            comp_medians_bs_thresh = 1.0 * np.median(comp_medians_bs_rms)
+                # Subtract median of each set of bootstrapped values from themselves (ie, find deviations from the median of each set of medians)
+                comp_medians_bs_dev = comp_medians_bs - np.array([np.median(comp_medians_bs, axis=1)]*comp_medians_bs.shape[1]).transpose()
 
-            # If median temp of current chain section is more than the determined threshold, call it metastable
-            if abs(test_median - comp_medians_median) > comp_medians_bs_thresh:
-                bad_chains[i] = True
+                # Find the RMS deviation within each bootstrapped set of deviations, and use this to inform the rejection threshold
+                comp_medians_bs_rms = np.mean(np.abs(comp_medians_bs_dev), axis=1)
+                comp_medians_bs_thresh = 1.0 * np.median(comp_medians_bs_rms)
 
-    # Also, access which chains have end regions with low variation (likely due to high rejection rates)
-    comp_stds = np.nanstd(mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j], axis=1)
-    comp_stds_std = np.nanstd(comp_stds)
-    comp_stds_mean = np.nanmean(comp_stds)
-    comp_stds_thresh = 2.0 * comp_stds_std
+                # If median temp of current chain section is more than the determined threshold, call it metastable
+                if abs(test_median - comp_medians_median) > comp_medians_bs_thresh:
+                    bad_chains[i] = True
 
-    # Marks chains with  high rejection rates as bad
-    comp_stds_bad = np.where((comp_stds<(comp_stds_mean-comp_stds_thresh)) | (comp_stds>(comp_stds_mean+comp_stds_thresh)))
-    bad_chains[comp_stds_bad] = True
+                # Also, access which chains have end regions with low variation (likely due to high rejection rates)
+                comp_stds = np.nanstd(mcmc_chains[comp_indices,-int(end_frac*mcmc_chains.shape[1]):,j], axis=1)
+                comp_stds_std = np.nanstd(comp_stds)
+                comp_stds_mean = np.nanmean(comp_stds)
+                comp_stds_thresh = 2.0 * comp_stds_std
 
-    # Set all values, for all parameters, in suspected metastable chains to be NaN
-    mcmc_chains[bad_chains,:,:] = np.nan
+                # Marks chains with  high rejection rates as bad
+                comp_stds_bad = np.where((comp_stds<(comp_stds_mean-comp_stds_thresh)) | (comp_stds>(comp_stds_mean+comp_stds_thresh)))
+                bad_chains[comp_stds_bad] = True
 
-    # Calculate the Gelman-Rubin criterion of each parameter from different start points
-    gr_times = np.linspace(0, mcmc_chains.shape[1]-1, num=100).astype(int)[1:]
-    gr = np.zeros([gr_times.shape[0], mcmc_chains.shape[2]])
-    for i in range(len(gr_times)):
-        t = gr_times[i]
-        gr[i,:] = GelmanRubin(mcmc_chains[:,-t:,:])
+                # Set all values, for all parameters, in suspected metastable chains to be NaN
+                mcmc_chains[bad_chains,:,:] = np.nan
 
-    # Return cleaned chain
-    return mcmc_chains
+        """# Calculate the Gelman-Rubin criterion of each parameter from different start points
+        gr_times = np.linspace(0, mcmc_chains.shape[1]-1, num=100).astype(int)[1:]
+        gr = np.zeros([gr_times.shape[0], mcmc_chains.shape[2]])
+        for i in range(len(gr_times)):
+            t = gr_times[i]
+            gr[i,:] = GelmanRubin(mcmc_chains[:,-t:,:])"""
+
+        # Return cleaned chain
+        return mcmc_chains
 
 
 

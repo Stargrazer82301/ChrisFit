@@ -5,7 +5,7 @@ if location == 'Orthanc':
     dropbox = 'E:\\Users\\Chris\\Dropbox\\'
 if location == 'sputnik':
     dropbox = '/home/chris/Dropbox/'
-if location in ['saruman','rosemary-pc']:
+if location in ['saruman','serpens']:
     dropbox = '/home/user/spx7cjc/Desktop/Herdata/Dropbox/'
 
 # Import smorgasbord
@@ -85,8 +85,8 @@ bands_frame['flux'] = pd.Series(np.array([len(bands_frame)*np.NaN]), index=bands
 bands_frame['error'] = pd.Series(np.array([len(bands_frame)*np.NaN]), index=bands_frame.index)
 
 # Decide underlying properties of source
-inject_temp = [21.7, 64.2]#[22.7]
-inject_mass = [10.0**8.5, 10.0**6.0]
+inject_temp = [21.7]#, 64.2]
+inject_mass = [10.0**8.5]#, 10.0**6.0]
 inject_beta = [1.9]
 inject_params = inject_temp+inject_mass+inject_beta
 
@@ -108,11 +108,12 @@ output = ChrisFit.Fit(gal_dict,
                       correl_unc = correl_unc,
                       beta_vary = True,
                       beta = 2.0,
-                      components = 1,
+                      components = 2,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
-                      mcmc_n_walkers = 8,#20
-                      mcmc_n_steps = 10000,#40000
+                      mcmc_n_walkers = 300,
+                      mcmc_n_steps = 1500,
+                      simple_clean = 0.66,
                       plot = 'Output/',
                       test = False,
                       priors = None)
