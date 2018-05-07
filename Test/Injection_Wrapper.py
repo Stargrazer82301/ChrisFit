@@ -77,7 +77,7 @@ priors = {'temp':[copy.deepcopy(TempPrior), copy.deepcopy(TempPrior)],
 
 # Use calibration and observational uncertainties to generate artificial errors
 calib_unc = np.array([0.05, 0.05, 0.2, 0.07, 0.07, 0.07, 0.055, 0.055, 0.055])
-obs_err = 2.0 * np.array([0.07, 0.15, 0.05, 0.05, 0.07, 0.05, 0.03, 0.03, 0.06])
+obs_err = (1 + np.random.normal(calib_unc.shape)) * np.array([0.07, 0.15, 0.05, 0.05, 0.07, 0.05, 0.03, 0.03, 0.06])
 inject_err = np.sqrt(obs_err**2.0 + calib_unc**2.0)
 
 # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
@@ -111,7 +111,7 @@ output = ChrisFit.Fit(gal_dict,
                       components = 2,
                       kappa_0 = 0.051,
                       kappa_0_lambda = 500E-6,
-                      mcmc_n_walkers = 300,
+                      mcmc_n_walkers = 250,
                       mcmc_n_steps = 1500,
                       simple_clean = 0.66,
                       plot = 'Output/',

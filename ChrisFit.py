@@ -1423,7 +1423,7 @@ def TracePlot(mcmc_chains, fit_dict):
         # Format axis
         ax[i].set_ylabel(labels[i])
         ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6, min_n_ticks=5, prune='both'))
-        ax[i].set_ylim(np.nanpercentile(mcmc_chains[:, :, i], 1), np.nanpercentile(mcmc_chains[:, :, i], 99))
+        ax[i].set_ylim(np.nanpercentile(mcmc_chains[:, :, i], 0.25), np.nanpercentile(mcmc_chains[:, :, i], 99.75))
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('MCMC Step')
