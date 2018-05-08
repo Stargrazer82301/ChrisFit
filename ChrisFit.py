@@ -332,9 +332,6 @@ def LnLike(params, fit_dict):
     # Calculate ln-likelihood of each flux, given measurement uncertainties and proposed model
     ln_like = np.log(scipy.stats.t.pdf(bands_flux_pred, 1, loc=bands_frame['flux'], scale=bands_unc))
 
-    # For values where normal evaluated to zero (being very far from mean), use a cheeky student's t instead
-    ln_like[np.where(ln_like == -np.inf)] = np.log(scipy.stats.t.pdf(bands_flux_pred, 1.0, loc=bands_frame['flux'], scale=bands_unc))[np.where(ln_like == -np.inf)]
-
     # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assigned same ln-likelihood as if predicted flux == observed flux
     ln_like[np.where(bands_frame['limit'].values)] = np.log(scipy.stats.t.pdf(bands_frame['flux'],
                                                                                  1.0,
