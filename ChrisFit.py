@@ -283,7 +283,7 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
-            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params}
+            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'sampler':mcmc_sampler}
         else:
             return {'medians':median_params,'mle':mle_params}
 
