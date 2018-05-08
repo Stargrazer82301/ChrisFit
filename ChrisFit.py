@@ -1137,17 +1137,29 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         lim_fluxes_tot[0,:] = np.percentile(post_fluxes_tot, 16, axis=0)
         lim_fluxes_tot[1,:] = np.percentile(post_fluxes_tot, 84, axis=0)
 
-        # Fit a model to the median fluxes in each small interval of wavelength
+        # Work out the median flux at a large number of closely-spaced wavelength intervals
         med_wavelengths = post_wavelengths[::5]
         med_fluxes_tot = np.median(post_fluxes_tot, axis=0)[::5]
         med_scatter_tot = np.std(post_fluxes_tot, axis=0)[::5]
         med_fit_dict = copy.deepcopy(fit_dict)
         med_fit_dict['bounds'] = True
+
+        # Take the fluxes at the small wavelength intervals, and create a fit_dict with them
         med_bands_frame = pd.DataFrame(columns=fit_dict['bands_frame'].columns)
         for i in range(len(med_fluxes_tot)-1):
-            med_bands_frame.loc[i] = [str(med_wavelengths[i]), False, med_wavelengths[i], med_fluxes_tot[i], med_scatter_tot[i], True]
-            med_fit_dict['bands_frame'] = med_bands_frame
+            med_bands_frame.loc[i,'band'] = 'SLICE'+str(int(round(med_wavelengths[i]*1E6)))
+            med_bands_frame.loc[i,'wavelength'] = med_wavelengths[i]
+            med_bands_frame.loc[i,'flux'] = med_fluxes_tot[i]
+            med_bands_frame.loc[i,'error'] = med_scatter_tot[i]
+            med_bands_frame.loc[i,'limit'] = False
+            med_bands_frame.loc[i,'det'] = True
+        med_bands_frame.loc[:,'wavelength'] = med_bands_frame['wavelength'].astype(float)
+        med_bands_frame.loc[:,'flux'] = med_bands_frame['flux'].astype(float)
+        med_bands_frame.loc[:,'error'] = med_bands_frame['error'].astype(float)
+        med_fit_dict['bands_frame'] = med_bands_frame
         med_initial = params.copy()
+
+        # Fit a model to the median fluxes in each small interval of wavelength
         NegLnLike = lambda *args: -LnLike(*args)
         med_opt = scipy.optimize.minimize(NegLnLike, med_initial, args=(med_fit_dict), method='Powell', options={'maxiter':500})
         med_params = med_opt.x
