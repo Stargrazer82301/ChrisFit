@@ -224,10 +224,10 @@ def Fit(gal_dict,
             if test:
                 dill.dump(mcmc_chains, open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'wb'))
 
-        # Identify and remove portions of chains exhibiting burn-in and meta-stability
+        # Identify and remove burn-in (and optionally, also search for meta-stability)
         if not danger:
             if verbose:
-                print(name_bracket_prefix + 'Removing burn-in and metastable chains')
+                print(name_bracket_prefix + 'Identifying burn-in')
             mcmc_chains_clean = ChainClean(mcmc_chains, simple_clean=simple_clean)
         else:
             mcmc_chains_clean = mcmc_chains
@@ -802,7 +802,7 @@ def ChainClean(mcmc_chains, simple_clean=False):
     """ Function to identify and remove chains, and portions of chains, exhibiting non-convergence """
 
     # If we're doing this the simple way, just lop some fraction off the start of every chain
-    if (simple_clean != False) and (isinstance(simple_clean, float)):
+    if isinstance(simple_clean, float):
         burnin =int(simple_clean * mcmc_chains.shape[1])
         mcmc_chains[:,:burnin,:] = np.nan
         return mcmc_chains
@@ -1436,7 +1436,7 @@ def TracePlot(mcmc_chains, fit_dict):
         # Format axis
         ax[i].set_ylabel(labels[i])
         ax[i].yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6, min_n_ticks=5, prune='both'))
-        ax[i].set_ylim(np.nanpercentile(mcmc_chains[:, :, i], 0.25), np.nanpercentile(mcmc_chains[:, :, i], 99.75))
+        ax[i].set_ylim(np.nanpercentile(mcmc_chains[:, :, i], 0.1), np.nanpercentile(mcmc_chains[:, :, i], 99.9))
 
     # Perform final formatting, and return figure and axes objects
     ax[-1:][0].set_xlabel('MCMC Step')
