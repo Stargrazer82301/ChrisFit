@@ -342,8 +342,6 @@ def LnLike(params, fit_dict):
 
     # Calculate and return final data ln-likelihood
     ln_like = np.sum(np.array(ln_like))
-    if ln_like == -np.inf:
-        pdb.set_trace()
     return ln_like
 
 
@@ -1077,20 +1075,20 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
 
     # Create flux and error columns, for plotting with
-    flux_plot = bands_frame['flux_corr'].values
-    error_plot = bands_frame['error'].values
-    errorbar_up, errorbar_down = bands_frame['error'].values, bands_frame['error'].values
+    flux_plot = bands_frame['flux_corr'].values.copy()
+    error_plot = bands_frame['error'].values.copy()
+    errorbar_up, errorbar_down = bands_frame['error'].values, bands_frame['error'].values.copy()
 
     # Format errorbar sizes deal with negative fluxes
-    error_plot[np.where(flux_plot <= 0)] -= flux_plot[np.where(flux_plot <= 0)]
+    errorbar_up[np.where(flux_plot <= 0)] = flux_plot[np.where(flux_plot <= 0)] + errorbar_up[np.where(flux_plot <= 0)]
     flux_plot[np.where(flux_plot <= 0)] = 1E-50
 
     # Format errobars to account for non-detections
-    errorbar_down[np.where(errorbar_down > flux_plot) ] = 0.999 * flux_plot[np.where(errorbar_down > flux_plot)]
+    errorbar_down[np.where(errorbar_down > flux_plot)] = 0.99999 * flux_plot[np.where(errorbar_down > flux_plot)]
 
     # Plot datapoints
     if np.sum(bands_frame['limit']) == 0:
-        ax.errorbar(bands_frame['wavelength']*1E6, flux_plot, yerr=[errorbar_up, errorbar_down], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+        ax.errorbar(bands_frame['wavelength']*1E6, flux_plot, yerr=[errorbar_down, errorbar_up], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
     else:
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']], yerr=[errorbar_down[bands_frame['limit']], errorbar_up[bands_frame['limit']]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
