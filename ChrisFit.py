@@ -191,7 +191,7 @@ def Fit(gal_dict,
             if verbose:
                 print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
             NegLnLike = lambda *args: -LnLike(*args)
-            mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-4, options={'maxiter':1000})
+            mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-4, options={'maxiter':1000,'maxfev':1000})
             mle_params = mle_opt.x
 
             # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
@@ -731,7 +731,7 @@ def MCMCInitial(mle_params, fit_dict):
                 accepted = False
 
             # Check that mass terms are all physical (ie, mass > 0 Msol); if so, convert back to linar space
-            if np.where(np.array(mass_vector)<0)[0].size > 0:
+            if np.where(np.array(10.0**np.array(mass_vector))<0)[0].size > 0:
                 accepted = False
             else:
                 walker_initial[len(temp_vector):len(temp_vector+mass_vector)] = 10**walker_initial[len(temp_vector):len(temp_vector+mass_vector)]
