@@ -536,7 +536,10 @@ def PriorsConstruct(fit_dict):
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
     bands_frame = fit_dict['bands_frame']
-    peak_flux = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux'].max()
+    fluxes_submm = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux']
+    if len(fluxes_submm) == 0:
+        Exception('Need fluxes with rest wavelenghts in 150-1000 um range to obtain meaningful constrains')
+    peak_flux = fluxes_submm.max()
     peak_lum = peak_flux * fit_dict['distance']**2.0
     peak_mass = 10**(np.log10(peak_lum)-8)
 
