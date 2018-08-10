@@ -1,4 +1,5 @@
 # Import smorgasbord
+import sys
 import pdb
 import os
 import copy
@@ -12,6 +13,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import inspect
+sys.path.append(os.path.dirname(os.path.realpath(os.path.dirname(inspect.getfile(inspect.currentframe())))))
 import ChrisFit
 
 
