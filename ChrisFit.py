@@ -65,7 +65,7 @@ def Fit(gal_dict,
         Arguments:
             gal_dict:
                     A dictionary, containing entries called 'name', 'distance', and 'redshift', giving the
-                    values for the target source in question
+                    values for the target source in question (with distance in units of parsecs)
             bands_frame:
                     A dataframe, with columns called 'band', 'wavelength, 'flux', 'error', and 'limit' providing the
                     relevant values for each band for the target source in question
@@ -527,7 +527,7 @@ def PriorsConstruct(fit_dict):
 
     # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
     temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
-    temp_mode = np.linspace(20.0, 55.0, num=fit_dict['components'])
+    temp_mode = np.linspace(20.0, 50.0, num=fit_dict['components'])
     temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
     for i in range(fit_dict['components']):
         temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
@@ -555,7 +555,7 @@ def PriorsConstruct(fit_dict):
 
     # Create beta priors, using gamma distribution
     if fit_dict['beta_vary']:
-        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3, loc=0, scale=1))
+        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 2.75, loc=0, scale=1))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
     # Return completed priors dictionary
@@ -665,7 +665,7 @@ def MaxLikeInitial(bands_frame, fit_dict):
     guess = []
 
     # Temperature guesses for 18K if one MBB; 18K and 50K if two MBB; equally spaced therebetween for 3 or more
-    temp_guess = np.linspace(20.0, 55.0, num=fit_dict['components'])
+    temp_guess = np.linspace(20.0, 50.0, num=fit_dict['components'])
     guess += temp_guess.tolist()
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
