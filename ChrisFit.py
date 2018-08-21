@@ -546,7 +546,7 @@ def PriorsConstruct(fit_dict):
     # Use likely cold dust mass to construct mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
     mass_mode = np.array([peak_mass] * fit_dict['components'])
     mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
-    mass_mode *= 10**((temp_mode-temp_mode[0])/-20)
+    mass_mode *= 10**((temp_mode-temp_mode[0])/-15)
     mass_mode = np.log10(mass_mode)
     mass_sigma = np.array([10.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
