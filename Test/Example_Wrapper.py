@@ -61,7 +61,7 @@ for g in np.random.permutation(cat_frame.index):
     # Create input dictionary for this galaxy
     gal_dict = {'name':cat_frame_gal['name'],
                 'distance':1E6*cat_frame_gal['dist'],
-                'redshift':3E5/cat_frame_gal['vel_helio']}
+                'redshift':cat_frame_gal['vel_helio']/3E5}
 
     # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
     bands_frame_gal['flux'] = pd.Series(np.array([len(bands_frame_gal)*np.NaN]), index=bands_frame_gal.index)
