@@ -7,10 +7,9 @@ import numpy as np
 import scipy.stats
 import scipy.ndimage
 import pandas as pd
+import inspect
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-sys.path.append(os.path.dirname(os.path.realpath(os.path.dirname(inspect.getfile(inspect.currentframe())))))
 sys.path.append(os.path.dirname(os.path.realpath(os.path.dirname(inspect.getfile(inspect.currentframe())))))
 import ChrisFit
 
