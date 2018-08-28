@@ -328,14 +328,14 @@ def LnLike(params, fit_dict):
                     bands_unc[i] = bands_frame.loc[b,'flux'] * np.sqrt((bands_frame.loc[b,'error']/bands_frame.loc[b,'flux'])**2.0 - correl_param['correl_scale']**2.0)
                     bands_flux_pred[j] *= 1 + correl_err_vector[i]
 
-    # Calculate ln-likelihood of each flux, given measurement uncertainties and proposed model
-    ln_like = np.log(scipy.stats.t.pdf(bands_flux_pred, 1, loc=bands_frame['flux'], scale=bands_unc))
+    # Calculate ln-likelihood of each flux, given measurement uncertainties and proposed model (the scipy student's t distriubution needs factor of 1.3654 applied to sigma to account for fact that the -sigma > x > sigma interval only contains 50% the probability density, not 68.298)
+    ln_like = np.log(scipy.stats.t.pdf(bands_flux_pred, 1, loc=bands_frame['flux'], scale=1.3654*bands_unc))
 
     # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assigned same ln-likelihood as if predicted flux == observed flux
     ln_like[np.where(bands_frame['limit'].values)] = np.log(scipy.stats.t.pdf(bands_frame['flux'],
                                                                                  1.0,
                                                                                  loc=bands_frame['flux'],
-                                                                                 scale=bands_unc))[np.where(bands_frame['limit'].values)]
+                                                                                 scale=1.3654*bands_unc))[np.where(bands_frame['limit'].values)]
 
     # Exclude the calculated ln-likelihood for bands where flux and/or uncertainty are NaN
     ln_like = ln_like[np.where((np.isnan(bands_frame['flux']) == False) & (np.isnan(bands_frame['error']) == False))]
