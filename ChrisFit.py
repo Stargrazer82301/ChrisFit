@@ -236,11 +236,11 @@ def Fit(gal_dict,
                 print(name_bracket_prefix + 'Generating trace plot')
         trace_fig, trace_ax = TracePlot(mcmc_chains_clean, fit_dict)
         if plot == True:
-            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=150)
+            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=300)
         elif plot != False:
             if isinstance(plot, str):
                 if os.path.exists(plot):
-                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=150)
+                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=300)
 
         # Combine MCMC chains into final posteriors for each parameter, excludig any samples that contain NaNs
         mcmc_samples = mcmc_chains_clean.reshape((-1, n_params))
@@ -256,11 +256,11 @@ def Fit(gal_dict,
                 print(name_bracket_prefix + 'Generating corner plot')
         corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
         if plot == True:
-            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=150)
+            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=300)
         elif plot != False:
             if isinstance(plot, str):
                 if os.path.exists(plot):
-                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=150)
+                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=300)
 
         # Plot SED
         if plot:
@@ -268,11 +268,11 @@ def Fit(gal_dict,
                 print(name_bracket_prefix + 'Generating SED plot')
         sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
-            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=150)
+            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
         elif plot != False:
             if isinstance(plot, str):
                 if os.path.exists(plot):
-                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=150)
+                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
 
         # Return results
         gc.collect()
@@ -1186,15 +1186,15 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
     # Construct strings containing parameter values
     temp_1_value_string = r'T$_{c}$ = '+str(np.around(temp_vector[0], decimals=3))[0:5]
-    mass_1_value_string = r',   M$_{c}$ = '+str(np.around(np.log10(mass_vector[0]), decimals=3))[0:5]
+    mass_1_value_string = r',   M$_{c}$ = '+str(np.around(np.log10(mass_vector[0]), decimals=2))[0:5]
     if fit_dict['components'] == 1:
         temp_2_value_string = r''
         mass_2_value_string = r''
         mass_tot_value_string = r''
     elif fit_dict['components'] == 2:
         temp_2_value_string = r'T$_{w}$ = '+str(np.around(temp_vector[1], decimals=3))[0:5]
-        mass_2_value_string = r',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=3))[0:5]
-        mass_tot_value_string = r'M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=3))[0:5]
+        mass_2_value_string = r',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=2))[0:5]
+        mass_tot_value_string = r'M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=2))[0:5]
     if (fit_dict['beta_vary'] == True) and (len(fit_dict['beta']) == 1):
         beta_1_value_string = r'$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]+',   '
     else:
