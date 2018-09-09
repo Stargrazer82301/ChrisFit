@@ -137,9 +137,9 @@ def Fit(gal_dict,
 
         # State name of source being processed
         if sys.stdout.isatty():
-            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(20-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
+            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(25-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
         else:
-            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(20-len('['+gal_dict['name']+']')))
+            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(25-len('['+gal_dict['name']+']')))
         if verbose:
             print(name_bracket_prefix  + 'Commencing processing')
 
