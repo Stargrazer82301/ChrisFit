@@ -184,6 +184,8 @@ def Fit(gal_dict,
         mle_fit_dict['correl_unc'] = False
         mle_initial = MaxLikeInitial(bands_frame, mle_fit_dict)
 
+
+
         # Find Maximum Likelihood Estimate (MLE)
         if test and os.path.exists(os.path.join(plot,gal_dict['name']+'_MCMC.dj')):
             mcmc_chains = dill.load(open(os.path.join(plot,gal_dict['name']+'_MCMC.dj'),'rb'))
@@ -281,9 +283,9 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
-            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'sampler':mcmc_sampler}
+            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'sampler':mcmc_sampler,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
         else:
-            return {'medians':median_params,'mle':mle_params}
+            return {'medians':median_params,'mle':mle_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
 
 
 
