@@ -1255,14 +1255,14 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Format figure axes and labels
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel(r'Wavelength ($\mu$m)', fontname=font_family)#, fontsize=17.5)
-    ax.set_ylabel('Flux Density (Jy)', fontname=font_family)#, fontsize=17.5)
+    ax.set_xlabel(r'Wavelength ($\mu$m)', fontname=font_family, fontsize=20.0)
+    ax.set_ylabel('Flux Density (Jy)', fontname=font_family, fontsize=20.0)
 
     # Format font of tick labels
     for xlabel in ax.get_xticklabels():
-        xlabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))
+        xlabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=17.5))
     for ylabel in ax.get_yticklabels():
-        ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=15))
+        ylabel.set_fontproperties(matplotlib.font_manager.FontProperties(family=font_family, size=17.5))
 
     # Return figure and axis objects
     return fig, ax
