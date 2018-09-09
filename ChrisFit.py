@@ -533,7 +533,13 @@ def PriorsConstruct(fit_dict):
     temp_phi = np.linspace(5.0, 15.0, num=fit_dict['components'])
     for i in range(fit_dict['components']):
         temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
-        temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
+        #temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
+        temp_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale)
+        temp_x = np.linspace(0, 500, num=1000)
+        temp_y = temp_like(temp_x)
+        temp_norm = np.trapz(temp_y, x=temp_x)
+        temp_like_norm = lambda temp, temp_like=temp_like: temp_like(temp) / temp_norm
+        temp_ln_like = lambda temp, temp_like_norm=temp_like_norm: np.log(temp_like_norm(temp))
         priors['temp'].append(temp_ln_like)
 
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
@@ -552,12 +558,24 @@ def PriorsConstruct(fit_dict):
     mass_mode = np.log10(mass_mode)
     mass_sigma = np.array([10.0] * fit_dict['components'])
     for i in range(fit_dict['components']):
-        mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
+        #mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
+        mass_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: 10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma)
+        mass_x = np.logspace(-10, 20, num=10000)
+        mass_y = mass_like(mass_x)
+        mass_norm = np.trapz(mass_y, x=mass_x)
+        mass_like_norm = lambda mass, mass_like=mass_like: mass_like(mass) / mass_norm
+        mass_ln_like = lambda mass, mass_like_norm=mass_like_norm: np.log(mass_like_norm(mass))
         priors['mass'].append(mass_ln_like)
 
     # Create beta priors, using gamma distribution
     if fit_dict['beta_vary']:
-        beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 2.75, loc=0, scale=1))
+        #beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3.00, loc=0, scale=1))
+        beta_like = lambda beta: scipy.stats.gamma.pdf(beta, 3.00, loc=0, scale=1)
+        beta_x = np.logspace(0, 20, num=500)
+        beta_y = mass_like(beta_x)
+        beta_norm = np.trapz(beta_y, x=beta_x)
+        beta_like_norm = lambda beta, beta_like=beta_like: beta_like(beta) / beta_norm
+        beta_ln_like = lambda beta, beta_like_norm=beta_like_norm: np.log(beta_like_norm(beta))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
     # Return completed priors dictionary
