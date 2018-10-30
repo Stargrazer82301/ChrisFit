@@ -181,6 +181,9 @@ def Fit(gal_dict,
         # Read in colour-correction tables
         fit_dict['colour_corrections'] = ColourCorrections(fit_dict)
 
+        # Construct priors as necessary
+        fit_dict['priors'] = PriorsConstruct(fit_dict)
+
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
         mle_fit_dict['bounds'] = True
@@ -359,11 +362,8 @@ def LnPrior(params, fit_dict):
     # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
     temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
-    # If a prior kwarg has been given, use that; otherwise, construce a set of default priors
-    if isinstance(fit_dict['priors'], dict):
-        priors = fit_dict['priors']
-    else:
-        priors = PriorsConstruct(fit_dict)
+    # Grab priors
+    priors = fit_dict['priors']
 
     # Declare empty list to hold ln-like of each parameter
     ln_like = []
@@ -519,8 +519,12 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
 
 def PriorsConstruct(fit_dict):
-    """ Function to automatically construct a set of default priors, given the basic parameters of the model as
-    described by the ChrisFit input """
+    """ Function to automatically construct a set of default priors (if no specific priors were passed to ChrisFit),
+    given the basic parameters of the model as described by the ChrisFit input """
+
+    # If priors have already been provided, then don't bother doing anything
+    if fit_dict['priors'] != None:
+        return fit_dict['priors']
 
     # Initialize dictionary to hold priors
     priors = {'temp':[],
@@ -581,7 +585,8 @@ def PriorsConstruct(fit_dict):
         beta_ln_like = lambda beta, beta_like_norm=beta_like_norm: np.log(beta_like_norm(beta))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
-    # Return completed priors dictionary
+    # Rcompleted priors dictionary
+    fit_dict['priors'] = priors
     return priors
 
 
