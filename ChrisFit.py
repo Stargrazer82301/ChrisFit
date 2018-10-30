@@ -178,6 +178,9 @@ def Fit(gal_dict,
         n_params = (2 * int(components)) + (int(fit_dict['beta_vary']) * len(fit_dict['beta'])) + len(correl_unc)
         fit_dict['n_params'] = n_params
 
+        # Read in colour-correction tables
+        fit_dict['colour_corrections'] = ColourCorrections(fit_dict)
+
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
         mle_fit_dict['bounds'] = True
@@ -316,7 +319,7 @@ def LnLike(params, fit_dict):
     # Calculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
     bands_instr = [band.split('_')[0] for band in bands_frame['band']]
     bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_instr, temp_vector, mass_vector, beta_vector,
-                                      kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
+                                      kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False, fit_dict=fit_dict)
     bands_flux_pred *= bands_col_correct[0]
 
     # If there are correlated uncertainty terms, reduce the flux uncertainties to uncorrelated (non-systematic) components, and update predicted fluxes
@@ -953,14 +956,52 @@ def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
 
 
 
+def ColourCorrections(fit_dict):
+    """ Function to read in all available colour-correction tables and record them to fit_dict, to prevent having to
+    read them in during every single function evaluation. Will work for any instrument for which file
+    'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
-def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa_0_lambda=500E-6, verbose=False):
+    # Set location of ChrisFuncs.py to be current working directory, recording the old CWD to switch back to later
+    old_cwd = os.getcwd()
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+    # Create empty dictionary within fit_dict to store colour-correction tables
+    fit_dict['colour_corrections'] = {}
+
+    # Extract names of instruments
+    bands_names = fit_dict['bands_frame']['band']
+    instruments = [band_name.split('_')[0] for band_name in bands_names]
+    instruments = list(set(instruments))
+
+    # Loop over instruments
+    for instrument in instruments:
+
+        # Identify instrument and wavelength, and read in corresponding colour-correction data
+        try:
+            try:
+                data_table = np.genfromtxt('Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
+            except:
+                data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument+'.csv'), delimiter=',', names=True)
+            fit_dict['colour_corrections'][instrument] = data_table
+        except:
+            pass
+
+    # Restore old CWD, and return fit_dict, replete with new colour-correction tables
+    os.chdir(old_cwd)
+    return fit_dict['colour_corrections']
+
+
+
+
+
+
+def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa_0_lambda=500E-6, verbose=False, fit_dict=None):
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
     # Set location of ChrisFuncs.py to be current working directory, recording the old CWD to switch back to later
     old_cwd = os.getcwd()
-    os.chdir(str(os.path.dirname(os.path.realpath(sys.argv[0]))))
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
     # Loop over bands (if only one band has been submitted, stick it in a list to enable looping)
     factor_result, index_result = [], []
@@ -971,27 +1012,37 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
         single = False
     for b in range(len(wavelength)):
 
-        # Identify instrument and wavelength, and read in corresponding colour-correction data
-        unknown = False
-        try:
+        # If a fit dictionary with colour-correction tabales has been provided, grab relevent table from there (if available)
+        if fit_dict != None:
+            if instrument[b] in fit_dict['colour_corrections'].keys():
+                data_table = fit_dict['colour_corrections'][instrument[b]]
+            else:
+                unknown = True
+
+        # If no colour-correction dictionary provided, look for table files in the local directory
+        else:
+            unknown = False
             try:
-                data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
+                try:
+                    data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
+                except:
+                    data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
             except:
-                data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
-            data_index = data_table['alpha']
-            data_column = 'K'+str(int(wavelength[b]*1E6))
-            data_factor = data_table[data_column]
-        except:
-            unknown = True
-            if verbose == True:
-                print(' ')
-                print('Instrument \''+instrument[b]+'\' not recognised, no colour correction applied.')
+                unknown = True
+                if verbose == True:
+                    print(' ')
+                    print('Instrument \''+instrument[b]+'\' not recognised, no colour correction applied.')
 
         # If instrument successfully identified, perform colour correction; otherwise, cease
         if unknown==True:
             factor = 1.0
             index = np.NaN
         elif unknown==False:
+
+            # Extract relevent columns from table
+            data_index = data_table['alpha']
+            data_column = 'K'+str(int(wavelength[b]*1E6))
+            data_factor = data_table[data_column]
 
             # Calculate relative flux at wavelengths at points at wavelengths 1% to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
             lambda_plus = wavelength[b]*1.01
