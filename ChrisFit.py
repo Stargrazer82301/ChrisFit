@@ -181,9 +181,15 @@ def Fit(gal_dict,
         # Read in colour-correction tables
         fit_dict['colour_corrections'] = ColourCorrections(fit_dict)
 
-        """# If not running in parallel, construct priors ahead of time
+        # If not running in parallel, and no custom priors provided, construct priors ahead of, but warn that this is slower
         if mcmc_n_threads == 1:
-            fit_dict['priors'] = PriorsConstruct(fit_dict)"""
+            # If priors already available, grab them; otherwise, generate now
+            if isinstance(fit_dict['priors'], dict):
+                pass
+            else:
+                fit_dict['priors'] = PriorsConstruct(fit_dict)
+                print(name_bracket_prefix  + 'No custom priors provided, so using defaults; note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions pass from externally can be handled more efficiently')
+
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
