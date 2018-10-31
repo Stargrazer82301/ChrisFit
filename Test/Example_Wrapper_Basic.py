@@ -7,11 +7,13 @@ import numpy as np
 import scipy.stats
 import scipy.ndimage
 import pandas as pd
+import multiprocessing as mp
 import inspect
 import matplotlib
 matplotlib.use('Agg')
 sys.path.append(os.path.dirname(os.path.realpath(os.path.dirname(inspect.getfile(inspect.currentframe())))))
 import ChrisFit
+
 
 
 # Create input dictionary for this galaxy
@@ -28,10 +30,10 @@ bands_frame = pd.DataFrame({'band':         ['WISE_22','PACS_70','PACS_100','PAC
 
 # Construct function for SPIRE correlated uncertainty
 def SpireCorrelUnc(prop, unc=0.04):
-    if abs(prop) > (5*unc):
+    if abs(prop) > (3*unc):
         return -np.inf
     else:
-        x = np.linspace(-5*unc, 5*unc, 5E3)
+        x = np.linspace(-3*unc, 3*unc, 500)
         y = np.zeros([x.size])
         y[np.where(np.abs(x)<=unc)] = 1
         y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
@@ -54,9 +56,10 @@ posterior = ChrisFit.Fit(gal_dict,
                          components = 2,
                          kappa_0 = 0.051,
                          kappa_0_lambda = 500E-6,
+                         mcmc_n_threads = int(round(mp.cpu_count()*1.0)),
                          mcmc_n_walkers = 500,
-                         mcmc_n_steps = 500,
+                         mcmc_n_steps = 1000,
                          plot = True,
-                         simple_clean = 0.5,
+                         simple_clean = 0.66,
                          test = False)
 

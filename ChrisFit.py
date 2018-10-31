@@ -181,8 +181,9 @@ def Fit(gal_dict,
         # Read in colour-correction tables
         fit_dict['colour_corrections'] = ColourCorrections(fit_dict)
 
-        # Construct priors as necessary
-        fit_dict['priors'] = PriorsConstruct(fit_dict)
+        """# If not running in parallel, construct priors ahead of time
+        if mcmc_n_threads == 1:
+            fit_dict['priors'] = PriorsConstruct(fit_dict)"""
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
@@ -362,8 +363,11 @@ def LnPrior(params, fit_dict):
     # Programatically extract dust temperature, dust mass, and beta (varible or fixed) parameter sub-vectors from params tuple
     temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
 
-    # Grab priors
-    priors = fit_dict['priors']
+    # If priors already available, grab them; otherwise, generate now
+    if isinstance(fit_dict['priors'], dict):
+        priors = fit_dict['priors']
+    else:
+        priors = PriorsConstruct(fit_dict)
 
     # Declare empty list to hold ln-like of each parameter
     ln_like = []
@@ -545,7 +549,7 @@ def PriorsConstruct(fit_dict):
         temp_x = np.linspace(0, 500, num=1000)
         temp_y = temp_like(temp_x)
         temp_norm = np.trapz(temp_y, x=temp_x)
-        temp_like_norm = lambda temp, temp_like=temp_like: temp_like(temp) / temp_norm
+        temp_like_norm = lambda temp, temp_like=temp_like, temp_norm=temp_norm: temp_like(temp) / temp_norm
         temp_ln_like = lambda temp, temp_like_norm=temp_like_norm: np.log(temp_like_norm(temp))
         priors['temp'].append(temp_ln_like)
 
@@ -570,7 +574,7 @@ def PriorsConstruct(fit_dict):
         mass_x = np.logspace(-10, 20, num=10000)
         mass_y = mass_like(mass_x)
         mass_norm = np.trapz(mass_y, x=mass_x)
-        mass_like_norm = lambda mass, mass_like=mass_like: mass_like(mass) / mass_norm
+        mass_like_norm = lambda mass, mass_like=mass_like, mass_norm=mass_norm: mass_like(mass) / mass_norm
         mass_ln_like = lambda mass, mass_like_norm=mass_like_norm: np.log(mass_like_norm(mass))
         priors['mass'].append(mass_ln_like)
 
@@ -585,8 +589,7 @@ def PriorsConstruct(fit_dict):
         beta_ln_like = lambda beta, beta_like_norm=beta_like_norm: np.log(beta_like_norm(beta))
         priors['beta'] = [beta_ln_like] * len(fit_dict['beta'])
 
-    # Rcompleted priors dictionary
-    fit_dict['priors'] = priors
+    # Return priors dictionary
     return priors
 
 
@@ -1004,10 +1007,6 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
-    # Set location of ChrisFuncs.py to be current working directory, recording the old CWD to switch back to later
-    old_cwd = os.getcwd()
-    os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
     # Loop over bands (if only one band has been submitted, stick it in a list to enable looping)
     factor_result, index_result = [], []
     if not hasattr(wavelength, '__iter__'):
@@ -1023,20 +1022,6 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
                 data_table = fit_dict['colour_corrections'][instrument[b]]
             else:
                 unknown = True
-
-        # If no colour-correction dictionary provided, look for table files in the local directory
-        else:
-            unknown = False
-            try:
-                try:
-                    data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
-                except:
-                    data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
-            except:
-                unknown = True
-                if verbose == True:
-                    print(' ')
-                    print('Instrument \''+instrument[b]+'\' not recognised, no colour correction applied.')
 
         # If instrument successfully identified, perform colour correction; otherwise, cease
         if unknown==True:
@@ -1067,8 +1052,7 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
         factor_result.append(factor)
         index_result.append(factor)
 
-    # Restore old cwd, and return results (grabbing single values if only one band is being processed)
-    os.chdir(old_cwd)
+    # Return results (grabbing single values if only one band is being processed)
     if single:
         return factor_result[0], index_result[0]
     else:
