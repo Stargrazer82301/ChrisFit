@@ -57,9 +57,9 @@ posterior = ChrisFit.Fit(gal_dict,
                          kappa_0 = 0.051,
                          kappa_0_lambda = 500E-6,
                          mcmc_n_threads = 1,#int(round(mp.cpu_count()*1.0)),
-                         mcmc_n_walkers = 50,
-                         mcmc_n_steps = 50,
-                         plot = True,
+                         mcmc_n_walkers = 500,
+                         mcmc_n_steps = 100,
+                         plot = False,
                          simple_clean = 0.66,
                          test = False)
 
