@@ -1026,7 +1026,19 @@ def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa
         if fit_dict != None:
             if instrument[b] in fit_dict['colour_corrections'].keys():
                 data_table = fit_dict['colour_corrections'][instrument[b]]
+                unknown = False
             else:
+                unknown = True
+
+        # If no pre-stored tables, then read in from file
+        else:
+            try:
+                try:
+                    data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
+                except:
+                    data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
+                unknown = False
+            except:
                 unknown = True
 
         # If instrument successfully identified, perform colour correction; otherwise, cease
