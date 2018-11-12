@@ -97,8 +97,7 @@ for g in np.random.permutation(cat_frame.index):
                              mcmc_n_walkers = 1000,
                              mcmc_n_steps = 2000,
                              plot = out_dir,
-                             simple_clean = 0.75,
-                             test = False)
+                             simple_clean = 0.75)
 
 # Jubilate
 print('All done!')
