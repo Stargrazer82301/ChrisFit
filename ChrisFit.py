@@ -137,7 +137,7 @@ def Fit(gal_dict,
 
         # State name of source being processed
         if sys.stdout.isatty():
-            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(25-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
+            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(23-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
         else:
             name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(25-len('['+gal_dict['name']+']')))
         if verbose:
@@ -184,10 +184,10 @@ def Fit(gal_dict,
         # No custom priors provided, construct priors ahead of time, but warn that this is slower
         if isinstance(fit_dict['priors'], dict):
             pass
-        else:
+        elif mcmc_n_threads == 1:
             fit_dict['priors'] = PriorsConstruct(fit_dict)
-            if mcmc_n_threads > 1:
-                print(name_bracket_prefix  + 'No custom priors provided; constructing default priors (note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions passed from externally can be handled more efficiently)')
+        else:
+            print(name_bracket_prefix  + 'No custom priors provided; constructing default priors (note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)')
 
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
