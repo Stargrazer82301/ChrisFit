@@ -1,38 +1,39 @@
 # Import smorgasbord
 import sys
-import pdb
 import os
-import copy
-import time
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
 import scipy.stats
 import scipy.ndimage
 import pandas as pd
+import multiprocessing as mp
+import inspect
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import inspect
 sys.path.append(os.path.dirname(os.path.realpath(os.path.dirname(inspect.getfile(inspect.currentframe())))))
 import ChrisFit
 
 
 
-# Read DustPedia photometry catalogue into dataframe
-cat_frame = pd.read_csv('DustPedia_Combined_Photometry_2.2.csv')
+# Create input dictionary for this galaxy
+gal_dict = {'name':'Test_Pixel_In_NGC628',
+            'distance':10.6E6,
+            'redshift':0.00219}
 
 # Create dataframe storing basic band information
-bands_frame = pd.DataFrame({'band':         ['WISE_22','Spitzer_24','IRAS_60','Spitzer_70','PACS_70','PACS_100','Spitzer_160','PACS_160','SPIRE_250','SPIRE_350','Planck_350','SPIRE_500','Planck_550', 'Planck_850', 'Planck_1380'],
-                            'wavelength':   np.array([22E-6, 24E-6, 60E-6, 70E-6, 70E-6, 100E-6, 160E-6, 160E-6, 250E-6, 350E-6, 350E-6, 500E-6, 550E-6, 850E-6, 1380E-6]),
-                            'limit':        [True, True, False, False, False, False, False, False, False, False, False, False, False, False, True]})
+bands_frame = pd.DataFrame({'band':         ['WISE_22','PACS_70','PACS_100','PACS_160','SPIRE_250','SPIRE_350','SPIRE_500'],
+                            'wavelength':   np.array([22E-6, 70E-6, 100E-6, 160E-6, 250E-6, 350E-6, 500E-6,]),
+                            'flux':         np.array([1.319E-3, 0.01478, 0.02406, 0.03998, 0.02324, 0.01153, 0.004160]),
+                            'error':        np.array([1.042E-4, 0.01129, 0.007339, 0.004859, 0.002094, 0.001200, 0.00051224]),
+                            'limit':        [True, False, False, False, False, False, False]})
 
 # Construct function for SPIRE correlated uncertainty
 def SpireCorrelUnc(prop, unc=0.04):
-    if abs(prop) > (5*unc):
+    if abs(prop) > (3*unc):
         return -np.inf
     else:
-        x = np.linspace(-5*unc, 5*unc, 5E3)
+        x = np.linspace(-3*unc, 3*unc, 500)
         y = np.zeros([x.size])
         y[np.where(np.abs(x)<=unc)] = 1
         y = scipy.ndimage.filters.gaussian_filter1d(y, sigma=len(x)*(0.005/(x.max()-x.min())))
@@ -46,51 +47,19 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
 # State output directory
 out_dir = 'Output/'
 
-# List target galaxies (skipping galaxies already processed)
-target_gals = ['NGC4030','NGC4559','NGC5496','NGC5584','NGC5658','NGC5690','NGC5691','NGC5705','NGC5719','NGC5740','NGC5746','NGC5750','UGC04684','UGC06879''UGC07396','UGC09299','UGC09470','UGC09482']
-processed_gals = set([processed_gal.split('_')[:-1][0] for processed_gal in os.listdir(out_dir) if '.png' in processed_gal])
-target_gals = list(set(target_gals) - processed_gals)
-
-# Loop over galaxies
-for g in np.random.permutation(cat_frame.index):
-    cat_frame_gal = cat_frame.loc[g]
-    if cat_frame_gal['name'] not in target_gals:
-        continue
-    bands_frame_gal = copy.deepcopy(bands_frame)
-
-    # Create input dictionary for this galaxy
-    gal_dict = {'name':cat_frame_gal['name'],
-                'distance':1E6*cat_frame_gal['dist'],
-                'redshift':cat_frame_gal['vel_helio']/3E5}
-
-    # Add empty columns to galaxy dictionary bands dataframe, to hold fluxes and uncertainties
-    bands_frame_gal['flux'] = pd.Series(np.array([len(bands_frame_gal)*np.NaN]), index=bands_frame_gal.index)
-    bands_frame_gal['error'] = pd.Series(np.array([len(bands_frame_gal)*np.NaN]), index=bands_frame_gal.index)
-
-    # Loop over bands, retrieving corresponding fluxes for this galaxy (where available)
-    for b in range(len(bands_frame_gal['band'])):
-        band = bands_frame_gal['band'][b]
-        if band in cat_frame.columns:
-            bands_frame_gal.loc[b,'flux'] = cat_frame.loc[:,band][g]
-            bands_frame_gal.loc[b,'error'] = cat_frame.loc[:,band+'_err'][g]
-
-        # Prune fluxes with major flags
-        if isinstance(cat_frame.loc[g][band+'_flag'], str) and any(flag in cat_frame.loc[g][band+'_flag'] for flag in ['C','A','N','e']):
-            bands_frame_gal.loc[b,'flux'] = np.NaN
-            bands_frame_gal.loc[b,'error'] = np.NaN
-
-    # Call ChrisFit
-    posterior = ChrisFit.Fit(gal_dict,
-                             bands_frame_gal,
-                             correl_unc = correl_unc,
-                             beta_vary = True,
-                             beta = 2.0,
-                             components = 2,
-                             kappa_0 = 0.051,
-                             kappa_0_lambda = 500E-6,
-                             mcmc_n_walkers = 1000,
-                             mcmc_n_steps = 2000,
-                             plot = out_dir,
-                             simple_clean = 0.5,
-                             test = False)
+# Call ChrisFit
+posterior = ChrisFit.Fit(gal_dict,
+                         bands_frame,
+                         correl_unc = correl_unc,
+                         beta_vary = True,
+                         beta = 2.0,
+                         components = 2,
+                         kappa_0 = 0.051,
+                         kappa_0_lambda = 500E-6,
+                         mcmc_n_threads = 1,#int(round(mp.cpu_count()*1.0)),
+                         mcmc_n_walkers = 250,
+                         mcmc_n_steps = 250,
+                         plot = False,
+                         simple_clean = 0.66,
+                         test = False)
 
