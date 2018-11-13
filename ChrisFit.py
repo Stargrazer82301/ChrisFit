@@ -184,7 +184,7 @@ def Fit(gal_dict,
         elif mcmc_n_threads == 1:
             fit_dict['priors'] = PriorsConstruct(fit_dict)
         else:
-            print(name_bracket_prefix  + 'No custom priors provided; constructing default priors (note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)')
+            print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
 
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
