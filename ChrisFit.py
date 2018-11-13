@@ -132,11 +132,10 @@ def Fit(gal_dict,
             """
 
 
-        # State name of source being processed
+        # State name of source, and enable fancy colour options if we're being run in a bona fide terminal environment
+        name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(23-len('['+gal_dict['name']+']')))
         if sys.stdout.isatty():
-            name_bracket_prefix = termcolor.colored('['+gal_dict['name']+']' + (' '*(23-len('['+gal_dict['name']+']'))), 'cyan', attrs=['bold'])
-        else:
-            name_bracket_prefix = '['+gal_dict['name']+']' + (' '*(25-len('['+gal_dict['name']+']')))
+            name_bracket_prefix = termcolor.colored(name_bracket_prefix, 'cyan', attrs=['bold'])
         if verbose:
             print(name_bracket_prefix  + 'Commencing processing')
 
@@ -184,7 +183,8 @@ def Fit(gal_dict,
         elif mcmc_n_threads == 1:
             fit_dict['priors'] = PriorsConstruct(fit_dict)
         else:
-            print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
+            if verbose:
+                print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
 
 
         # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
@@ -199,7 +199,7 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
-        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-4, options={'maxiter':1000,'maxfev':1000})
+        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5, options={'maxiter':5000,'maxfev':5000})
         mle_params = mle_opt.x
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
@@ -338,8 +338,8 @@ def LnLike(params, fit_dict):
     ln_like = np.log(scipy.stats.t.pdf(bands_flux_pred, 1, loc=bands_frame['flux'], scale=1.3654*bands_unc))
 
     # Factor in limits; for bands with limits if predicted flux is <= observed flux, it is assigned same ln-likelihood as if predicted flux == observed flux
-    where_below_limit = np.where((bands_frame['limit'].values) & (bands_flux_pred>bands_frame['flux']))
-    ln_like[where_below_limit] = np.log(scipy.stats.t.pdf(bands_frame['flux'], 1.0, loc=bands_frame['flux'], scale=1.3654*bands_unc))[where_below_limit]
+    where_below_limit = np.where((bands_frame['limit'].values) & (bands_flux_pred<bands_frame['flux']))
+    ln_like[where_below_limit] = np.log(scipy.stats.t.pdf(bands_frame['flux'], 1, loc=bands_frame['flux'], scale=1.3654*bands_unc))[where_below_limit]
 
     # Exclude the calculated ln-likelihood for bands where flux and/or uncertainty are NaN
     ln_like = ln_like[np.where((np.isnan(bands_frame['flux']) == False) & (np.isnan(bands_frame['error']) == False))]
