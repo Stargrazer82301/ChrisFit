@@ -231,7 +231,7 @@ def Fit(gal_dict,
         # Identify and remove burn-in (and optionally, also search for meta-stability)
         if not danger:
             if verbose:
-                print(name_bracket_prefix + 'Identifying burn-in')
+                print(name_bracket_prefix + 'Removing burn-in')
             mcmc_chains_clean = ChainClean(mcmc_chains, simple_clean=simple_clean)
         else:
             mcmc_chains_clean = mcmc_chains
@@ -886,7 +886,7 @@ def ChainClean(mcmc_chains, simple_clean=False):
                 comp_stds_mean = np.nanmean(comp_stds)
                 comp_stds_thresh = 2.0 * comp_stds_std
 
-                # Marks chains with  high rejection rates as bad
+                # Marks chains with high rejection rates as bad
                 comp_stds_bad = np.where((comp_stds<(comp_stds_mean-comp_stds_thresh)) | (comp_stds>(comp_stds_mean+comp_stds_thresh)))
                 bad_chains[comp_stds_bad] = True
 
@@ -1480,8 +1480,7 @@ def TracePlot(mcmc_chains, fit_dict):
 
     # Generate figure, with subplot for each parameter
     labels = ParamsLabel(fit_dict)
-    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1,
-                           figsize=(8,(1.5*fit_dict['n_params'])), sharex=True, squeeze=True)
+    fig, ax = plt.subplots(nrows=mcmc_chains.shape[2], ncols=1, figsize=(8,(1.5*fit_dict['n_params'])), sharex=True, squeeze=True)
 
     # Put masses into log space
     mcmc_chains = mcmc_chains.copy()
