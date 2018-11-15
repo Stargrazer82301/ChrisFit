@@ -1034,7 +1034,7 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
         if band not in trans_dict:
             return 1.0
         else:
-            band_filter = trans_dict[band]
+            band_filter = trans_dict[band].copy()
             band_filter[:,0] /= 1E6
 
         # Check if reference spectrum present in transmission dictionary; if it is, construct spectrum array
@@ -1077,7 +1077,8 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
 
         # Calculate and return colour correction factor from integrals
         factor = ref_int / source_int
-
+        if np.isnan(factor):
+            pdb.set_trace()
         # Append results to output lists
         factor_result.append(factor)
 
