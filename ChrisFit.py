@@ -175,7 +175,7 @@ def Fit(gal_dict,
         fit_dict['n_params'] = n_params
 
         # Read in colour-correction tables
-        fit_dict['colour_corrections'] = PrefetchColourCorrections(fit_dict)
+        fit_dict['trans_dict'] = PrefetchColourCorrections(fit_dict)
 
         # No custom priors provided, construct priors ahead of time, but warn that this is slower
         if isinstance(fit_dict['priors'], dict):
@@ -318,10 +318,9 @@ def LnLike(params, fit_dict):
                                 kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
 
     # Calculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
-    bands_instr = [band.split('_')[0] for band in bands_frame['band']]
-    bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_instr, temp_vector, mass_vector, beta_vector,
+    bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_frame['band'], temp_vector, mass_vector, beta_vector,
                                       kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False, fit_dict=fit_dict)
-    bands_flux_pred *= bands_col_correct[0]
+    bands_flux_pred *= bands_col_correct
 
     # If there are correlated uncertainty terms, reduce the flux uncertainties to uncorrelated (non-systematic) components, and update predicted fluxes
     bands_unc =  bands_frame['error'].values.copy()
@@ -959,111 +958,140 @@ def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
 
 
 
-def PrefetchColourCorrections(fit_dict):
-    """ Function to read in all available colour-correction tables and record them to fit_dict, to prevent having to
-    read them in during every single function evaluation. Will work for any instrument for which file
-    'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
+
+def PrefetchColourCorrections():
+    """ Function to read in a data file containing instrumental response curves, and descritions of reference spectra,
+    containging this information for all the bands where colour corrections are desired. The format should be:
+    The first row for a given band takes form 'band,[BAND NAME]'.
+    The following row for a given band provides a description of that band's calibration reference spectrum, taking
+        the form 'ref,[SPECTRUM_DESCRIPTION]'; the spectrum description can be either nu_X, where X is replaced by a
+        number giving the index of some frequency-dependent power law spectrum; of BB_T, where T is replaced by a number
+        giving the temperature of a blackbody spectrum. Note that this line can be ommitted entirely
+    All subsequent rows for a given band then provide the actual transmission data for a large number of increments in
+        wavelength (in microns), and take the form '[SOME WAVELENGTH IN MICRONS],[TRANSMISSION FRACTION]'.
+    This format can be repeated to fit transmissions data for any number of bands in one file."""
 
     # Set location of ChrisFuncs.py to be current working directory, recording the old CWD to switch back to later
     old_cwd = os.getcwd()
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
-    # Create empty dictionary within fit_dict to store colour-correction tables
-    fit_dict['colour_corrections'] = {}
+    # Read in transmission curves file, and loop over lines
+    trans_dict = {'refs':{}}
+    with open('Transmissions.dat') as curve_file:
+        curve_list = curve_file.readlines()
+    for i in range(0,len(curve_list)):
+        curve_line = curve_list[i]
 
-    # Extract names of instruments
-    bands_names = fit_dict['bands_frame']['band']
-    instruments = [band_name.split('_')[0] for band_name in bands_names]
-    instruments = list(set(instruments))
+        # Check if this line indicates start of a new band; if so, start recording new band
+        if curve_line[:4] == 'band':
+            band = curve_line[5:].replace('\n','')
+            trans_dict[band] = []
 
-    # Loop over instruments
-    for instrument in instruments:
+        # Check if this line contains reference spectrun information; if so, place in the 'refs' dictionary entry
+        elif curve_line[:3] == 'ref':
+            trans_dict['refs'][band] = curve_line[4:].replace('\n','')
 
-        # Identify instrument and wavelength, and read in corresponding colour-correction data
-        try:
-            try:
-                data_table = np.genfromtxt('Colour_Corrections_'+instrument+'.csv', delimiter=',', names=True)
-            except:
-                data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument+'.csv'), delimiter=',', names=True)
-            fit_dict['colour_corrections'][instrument] = data_table
-        except:
-            pass
+        # Check if this line contains regular transmission information; if so, record
+        else:
+            trans_dict[band].append(curve_line.replace('\n','').split(','))
 
-    # Restore old CWD, and return fit_dict, replete with new colour-correction tables
+    # Loop over filters in filter dict, setting them to be arrays
+    for curve in trans_dict.keys():
+        if curve != 'refs':
+            trans_dict[curve] = np.array(trans_dict[curve]).astype(float)
+
+    # Restore old CWD, and colour
     os.chdir(old_cwd)
-    return fit_dict['colour_corrections']
+    return trans_dict
 
 
 
 
 
-
-def ColourCorrect(wavelength, instrument, temp, mass, beta, kappa_0=0.051, kappa_0_lambda=500E-6, verbose=False, fit_dict=None):
+def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_lambda=500E-6, verbose=False, fit_dict=None):
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
+    # Check if a fit dict has been provided; if it has, grab the transmission dict from it
+    if fit_dict != None:
+        trans_dict = fit_dict['trans_dict']
+    else:
+        trans_dict = PrefetchColourCorrections()
+
+    # Construct source SED given current proposed model
+    source_spec_lambda = np.logspace(-6,-2,5000)
+    source_spec = np.array([source_spec_lambda, ModelFlux(source_spec_lambda, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)]).transpose()
+
     # Loop over bands (if only one band has been submitted, stick it in a list to enable looping)
-    factor_result, index_result = [], []
-    if not hasattr(wavelength, '__iter__'):
+    factor_result = []
+    if not hasattr(wavelengths, '__iter__'):
         single = True
-        wavelength, instrument = [wavelength], [instrument]
+        wavelengths, bands = [wavelengths], [bands]
     else:
         single = False
-    for b in range(len(wavelength)):
+    for b in range(len(bands)):
+        band = bands[b]
+        wavelength = wavelengths[b]
 
-        # If a fit dictionary with colour-correction tabales has been provided, grab relevent table from there (if available)
-        if fit_dict != None:
-            if instrument[b] in fit_dict['colour_corrections'].keys():
-                data_table = fit_dict['colour_corrections'][instrument[b]]
-                unknown = False
-            else:
-                unknown = True
-
-        # If no pre-stored tables, then read in from file
+        # Check that requested filter is actually in dictionary; if it is grab it, if it isn't return correction factor of 1.0
+        if band not in trans_dict:
+            return 1.0
         else:
-            try:
-                try:
-                    data_table = np.genfromtxt('Colour_Corrections_'+instrument[b]+'.csv', delimiter=',', names=True)
-                except:
-                    data_table = np.genfromtxt(os.path.join('ChrisFit','Colour_Corrections_'+instrument[b]+'.csv'), delimiter=',', names=True)
-                unknown = False
-            except:
-                unknown = True
+            band_filter = trans_dict[band].copy()
+            band_filter[:,0] /= 1E6
 
-        # If instrument successfully identified, perform colour correction; otherwise, cease
-        if unknown==True:
-            factor = 1.0
-            index = np.NaN
-        elif unknown==False:
+        # Check if reference spectrum present in transmission dictionary; if it is, construct spectrum array
+        if (band in trans_dict.keys()) and (band in trans_dict['refs'].keys()):
+            nu = (c / band_filter[:,0])
 
-            # Extract relevent columns from table
-            data_index = data_table['alpha']
-            data_column = 'K'+str(int(wavelength[b]*1E6))
-            data_factor = data_table[data_column]
+            # If reference is a power law, turn into corresponding array of values at same wavelength intervals as filter curve
+            if trans_dict['refs'][band][:2] == 'nu':
+                index = float(trans_dict['refs'][band][3:])
+                ref_spec = np.zeros(band_filter.shape)
+                ref_spec[:,0] = band_filter[:,0]
+                ref_spec[:,1] = nu**index
+                #ref_spec[:,1] /= np.max(ref_spec[:,1])
 
-            # Calculate relative flux at wavelengths at points at wavelengths 1% to either side of target wavelength (no need for distance or kappa, as absolute value is irrelevant)
-            lambda_plus = wavelength[b]*1.01
-            lambda_minus = wavelength[b]*0.99
-            flux_plus = ModelFlux(lambda_plus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
-            flux_minus = ModelFlux(lambda_minus, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)
+            # If reference spectrum is a blackbody, turn into a corresponding array of values at same wavelength intervals as filter curve
+            if trans_dict['refs'][band][:2] == 'BB':
+                temp = float(trans_dict['refs'][band][3:])
+                ref_spec = np.zeros(band_filter.shape)
+                ref_spec[:,0] = band_filter[:,0]
+                planck_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+                planck_exponent = (h * nu) / (k * temp)
+                ref_spec[:,1] = planck_prefactor * (np.e**planck_exponent - 1)**-1.0
+                #ref_spec[:,1] /= np.max(ref_spec[:,1])
 
-            # Determine spectral index (remembering to convert to frequency space)
-            index = ( np.log10(flux_plus) - np.log10(flux_minus) ) / ( np.log10(lambda_plus) - np.log10(lambda_minus) )
-            index= -1.0 * index
+        # If reference spectrum not in Transmission.dat, nor provided by user, raise exception
+        else:
+            raise Exception('Reference spectrum not given, nor found in dictionary of band transmissions; please provide reference spectrum')
 
-            # Use cubic spline interpolation to estimate colour-correction divisor at calculated spectral index
-            interp = scipy.interpolate.interp1d(data_index, data_factor, kind='linear', bounds_error=None, fill_value='extrapolate')
-            factor = interp(index)[0]
+        # Normalise source and reference SEDs to have observed flux at (interpolated) nominal wavelength
+        source_spec[:,1] /= np.interp(wavelength, source_spec[:,0], source_spec[:,1])
+        ref_spec[:,1] /= np.interp(wavelength, ref_spec[:,0], ref_spec[:,1])
+
+        # Filter SEDs by response curve (appropriately resampled in wavelength intervals), to record observed flux
+        source_obs = source_spec[:,1] * np.interp(source_spec[:,0], band_filter[:,0], band_filter[:,1])
+        ref_obs = ref_spec[:,1] * np.interp(ref_spec[:,0], band_filter[:,0], band_filter[:,1])
+
+        # Integrate observed filtered SEDs (in intervals of freqency, as Jy are in terms of Hz)
+        source_int = np.trapz(source_obs, x=(c/source_spec[:,0]))
+        ref_int = np.trapz(ref_obs, x=(c/ref_spec[:,0]))
+
+        # Calculate and return colour correction factor from integrals
+        factor = ref_int / source_int
 
         # Append results to output lists
-        factor_result.append(factor)
-        index_result.append(factor)
+        try:
+            factor_result.append(factor)
+        except:
+            pdb.set_trace()
 
     # Return results (grabbing single values if only one band is being processed)
     if single:
-        return factor_result[0], index_result[0]
+        return factor_result[0]
     else:
-        return np.array(factor_result), np.array(index_result)
+        return np.array(factor_result)
 
 
 
@@ -1137,10 +1165,10 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Colour-correct fluxes according to model being plotted
     bands_frame.loc[:,'flux_corr'] = bands_frame['flux'].copy()
     for b in bands_frame.index:
-        colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'].split('_')[0],
+        colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'],
                                            temp_vector, mass_vector, beta_vector,
                                            kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
-        bands_frame.loc[b,'flux_corr'] = bands_frame.loc[b,'flux'] * colour_corr_factor[0]
+        bands_frame.loc[b,'flux_corr'] = bands_frame.loc[b,'flux'] * colour_corr_factor
 
 
 
