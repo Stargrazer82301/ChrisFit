@@ -175,7 +175,7 @@ def Fit(gal_dict,
         fit_dict['n_params'] = n_params
 
         # Read in colour-correction tables
-        fit_dict['colour_corrections'] = ColourCorrections(fit_dict)
+        fit_dict['colour_corrections'] = PrefetchColourCorrections(fit_dict)
 
         # No custom priors provided, construct priors ahead of time, but warn that this is slower
         if isinstance(fit_dict['priors'], dict):
@@ -959,7 +959,7 @@ def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
 
 
 
-def ColourCorrections(fit_dict):
+def PrefetchColourCorrections(fit_dict):
     """ Function to read in all available colour-correction tables and record them to fit_dict, to prevent having to
     read them in during every single function evaluation. Will work for any instrument for which file
     'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
