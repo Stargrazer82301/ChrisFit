@@ -1013,7 +1013,7 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
     # Create result storage arrays, and grab transmission dictionary
-    factor_result, index_result = [], []
+    factor_result = []
     trans_dict = fit_dict['trans_dict']
 
     # Construct source SED given current proposed model
