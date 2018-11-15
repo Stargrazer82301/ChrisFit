@@ -959,14 +959,14 @@ def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
 
 
 
-def PrefetchColourCorrections(fit_dict):
+def PrefetchColourCorrections():
     """ Function to read in a data file containing instrumental response curves, and descritions of reference spectra,
     containging this information for all the bands where colour corrections are desired. The format should be:
     The first row for a given band takes form 'band,[BAND NAME]'.
-    The following row for a givnen band may optionally contain information about that band's reference spectrum, taking
+    The following row for a given band provides a description of that band's calibration reference spectrum, taking
         the form 'ref,[SPECTRUM_DESCRIPTION]'; the spectrum description can be either nu_X, where X is replaced by a
         number giving the index of some frequency-dependent power law spectrum; of BB_T, where T is replaced by a number
-        giving the temperature of a blackbody spectrum.
+        giving the temperature of a blackbody spectrum. Note that this line can be ommitted entirely
     All subsequent rows for a given band then provide the actual transmission data for a large number of increments in
         wavelength (in microns), and take the form '[SOME WAVELENGTH IN MICRONS],[TRANSMISSION FRACTION]'.
     This format can be repeated to fit transmissions data for any number of bands in one file."""
@@ -1012,15 +1012,18 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
     """ Function to calculate colour-correction FACTOR appropriate to a given underlying spectrum. Will work for any
     instrument for which file 'Color_Corrections_INSTRUMENTNAME.csv' is found in the same directory as this script. """
 
-    # Create result storage arrays, and grab transmission dictionary
-    factor_result = []
-    trans_dict = fit_dict['trans_dict']
+    # Check if a fit dict has been provided; if it has, grab the transmission dict from it
+    if fit_dict != None:
+        trans_dict = fit_dict['trans_dict']
+    else:
+        trans_dict = PrefetchColourCorrections()
 
     # Construct source SED given current proposed model
     source_spec_lambda = np.logspace(-6,-2,5000)
     source_spec = np.array([source_spec_lambda, ModelFlux(source_spec_lambda, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)]).transpose()
 
     # Loop over bands (if only one band has been submitted, stick it in a list to enable looping)
+    factor_result = []
     if not hasattr(wavelengths, '__iter__'):
         single = True
         wavelengths, bands = [wavelengths], [bands]
@@ -1077,10 +1080,12 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
 
         # Calculate and return colour correction factor from integrals
         factor = ref_int / source_int
-        if np.isnan(factor):
-            pdb.set_trace()
+
         # Append results to output lists
-        factor_result.append(factor)
+        try:
+            factor_result.append(factor)
+        except:
+            pdb.set_trace()
 
     # Return results (grabbing single values if only one band is being processed)
     if single:
