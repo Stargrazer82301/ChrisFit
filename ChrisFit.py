@@ -56,6 +56,7 @@ def Fit(gal_dict,
         mcmc_n_threads = int(round(mp.cpu_count()*1.0)),
         simple_clean = False,
         full_posterior = True,
+        mle_only = False,
         danger = False,
         verbose = True):
         """
@@ -124,6 +125,8 @@ def Fit(gal_dict,
             full_posterior:
                     A boolean, stating whether the full posterior distribution of each parameter should be
                     returned, or just the summary of median, credible interval, etc
+            mle_only:
+                    A boolean, which requests that only a Quick Maximum Likelihood estimation be performed.
             danger:
                     A boolean, which if True will prioritise speed over caution (enabling the emcee live_dangerously
                     kwarg, and scatting the initial positions of the walkers a bit less)
@@ -175,7 +178,7 @@ def Fit(gal_dict,
         fit_dict['n_params'] = n_params
 
         # Read in colour-correction tables
-        fit_dict['trans_dict'] = PrefetchColourCorrections(fit_dict)
+        fit_dict['trans_dict'] = PrefetchColourCorrections()
 
         # No custom priors provided, construct priors ahead of time, but warn that this is slower
         if isinstance(fit_dict['priors'], dict):
@@ -201,6 +204,10 @@ def Fit(gal_dict,
         NegLnLike = lambda *args: -LnLike(*args)
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5, options={'maxiter':5000,'maxfev':5000})
         mle_params = mle_opt.x
+
+        # If only MLE fit was requested, return results now
+        if mle_only:
+            return {'mle':mle_params}
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))

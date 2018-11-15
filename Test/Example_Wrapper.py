@@ -60,5 +60,5 @@ posterior = ChrisFit.Fit(gal_dict,
                          mcmc_n_walkers = 500,
                          mcmc_n_steps = 500,
                          plot = out_dir,
-                         simple_clean = 0.66)
+                         simple_clean = 0.5)
 
