@@ -54,7 +54,7 @@ def Fit(gal_dict,
         mcmc_n_walkers = 250,
         mcmc_n_steps = 2500,
         mcmc_n_threads = int(round(mp.cpu_count()*1.0)),
-        simple_clean = False,
+        simple_clean = 0.5,
         full_posterior = True,
         mle_only = False,
         danger = False,
@@ -120,8 +120,8 @@ def Fit(gal_dict,
                     A boolean or float, descrbing the type of chain cleaning to be performed. If False, a full cleaning
                     will be performed, with convergance diagnostics to remove burn-in, metastability analysis to exclude
                     bad chains. If a float in the range 0-1 is given, then all that is done is that fraction of the
-                    all is removed as burn-in; if you have enough of walkers (ie, hundreds) and steps (ie, thousands),
-                    then using this simple option and removing the first 50% all chains should
+                    total is removed as burn-in; if you have enough of walkers (ie, hundreds) and steps (ie, thousands),
+                    then using this simple option and removing the first 50% all chains should give a good output
             full_posterior:
                     A boolean, stating whether the full posterior distribution of each parameter should be
                     returned, or just the summary of median, credible interval, etc
