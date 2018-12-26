@@ -202,7 +202,7 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
-        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=5E-5, options={'maxiter':5000,'maxfev':5000})
+        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         mle_params = mle_opt.x
 
         # If only MLE fit was requested, return results now
