@@ -1421,7 +1421,8 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
                 line_y = line_y * 0.9 * max(ax.get_ylim()) * line_y.max()**-1
                 ax.plot(line_x,line_y, color='black')
 
-            # Also, set tick marks to point inside plots
+                # Also, make column titles smaller to fit in long variable names, and set tick marks to point inside plots
+                ax.set_title(ax.get_title(), fontsize=15)
             ax.tick_params(direction='in')
 
     # Return final figure and axes objects
