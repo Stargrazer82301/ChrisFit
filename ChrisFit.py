@@ -18,6 +18,7 @@ import scipy.optimize
 import scipy.ndimage
 import pandas as pd
 import matplotlib
+matplotlib.rcParams['font.sans-serif'] = 'DejaVu Sans'
 #matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker
@@ -1143,7 +1144,8 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Enable seaborn for easy, attractive plots
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
-    sns.set_style('ticks', {'font.sans-serif':'Bitstream Vera Sans'})
+    sns.set_style('ticks', {'font.sans-serif':'DejaVu Sans'})
+    matplotlib.rcParams['font.sans-serif'] = 'DejaVu Sans'
 
 
 
@@ -1382,7 +1384,8 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
     # Enable seaborn for easy, attractive plots
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
-    sns.set_style('ticks')
+    sns.set_style('ticks', {'font.sans-serif':'DejaVu Sans'})
+    matplotlib.rcParams['font.sans-serif'] = 'DejaVu Sans'
 
     # Generate label strings for parameter names
     labels = ParamsLabel(fit_dict)
@@ -1434,7 +1437,8 @@ def Autocorr(mcmc_chains, fit_dict):
     # Enable seaborn for easy, attractive plots
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
-    sns.set_style('ticks')
+    sns.set_style('ticks', {'font.sans-serif':'DejaVu Sans'})
+    matplotlib.rcParams['font.sans-serif'] = 'DejaVu Sans'
 
     # Define colour palettes to use for different parameters (up to three components)
     temp_palettes = ['PuBu', 'PuBuGn', 'PuGn']
