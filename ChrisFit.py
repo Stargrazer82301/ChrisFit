@@ -1143,7 +1143,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Enable seaborn for easy, attractive plots
     plt.ioff()
     sns.set(context='talk') # Possible context settings are 'notebook' (default), 'paper', 'talk', and 'poster'
-    sns.set_style('ticks')
+    sns.set_style('ticks', {'font.sans-serif':'Bitstream Vera Sans'})
 
 
 
