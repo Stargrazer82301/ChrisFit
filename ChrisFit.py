@@ -248,7 +248,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating trace plot')
-        trace_fig, trace_ax = TracePlot(mcmc_chains_clean, fit_dict)
+            trace_fig, trace_ax = TracePlot(mcmc_chains_clean, fit_dict)
         if plot == True:
             trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=300)
         elif plot != False:
@@ -268,7 +268,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
-        corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
+            corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
         if plot == True:
             corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=300)
         elif plot != False:
@@ -280,7 +280,7 @@ def Fit(gal_dict,
         if plot:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
-        sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
+            sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
         if plot == True:
             sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
         elif plot != False:
