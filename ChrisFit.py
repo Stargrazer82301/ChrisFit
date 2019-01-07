@@ -245,16 +245,19 @@ def Fit(gal_dict,
             mcmc_chains_clean = mcmc_chains
 
         # Plot trace of MCMC chains
-        if plot:
+        if plot != False:
             if verbose:
                 print(name_bracket_prefix + 'Generating trace plot')
             trace_fig, trace_ax = TracePlot(mcmc_chains_clean, fit_dict)
-        if plot == True:
-            trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=300)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=300)
+            if plot == True:
+                trace_fig.savefig(gal_dict['name']+'_Trace.png', dpi=300)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        trace_fig.savefig(os.path.join(plot,gal_dict['name']+'_Trace.png'), dpi=300)
+        else:
+            trace_fig = None
+
 
         # Combine MCMC chains into final posteriors for each parameter, excludig any samples that contain NaNs
         mcmc_samples = mcmc_chains_clean.reshape((-1, n_params))
@@ -265,28 +268,33 @@ def Fit(gal_dict,
         median_params = np.median(mcmc_samples, axis=0)
 
         # Plot posterior corner plot
-        if plot:
+        if plot != False:
             if verbose:
                 print(name_bracket_prefix + 'Generating corner plot')
             corner_fig, corner_ax = CornerPlot(mcmc_samples.copy(), [np.nan]*n_params, fit_dict)
-        if plot == True:
-            corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=300)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=300)
+            if plot == True:
+                corner_fig.savefig(gal_dict['name']+'_Corner.png', dpi=300)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        corner_fig.savefig(os.path.join(plot,gal_dict['name']+'_Corner.png'), dpi=300)
+        else:
+            corner_fig = None
 
         # Plot SED
-        if plot:
+        if plot != False:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
             sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
-        if plot == True:
-            sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
-        elif plot != False:
-            if isinstance(plot, str):
-                if os.path.exists(plot):
-                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
+            if plot == True:
+                sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
+            elif plot != False:
+                if isinstance(plot, str):
+                    if os.path.exists(plot):
+                        sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
+        else:
+            sed_fig = None
+
 
         # Return results
         gc.collect()
