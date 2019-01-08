@@ -58,6 +58,7 @@ def Fit(gal_dict,
         simple_clean = 0.5,
         full_posterior = True,
         mle_only = False,
+        map_only = False,
         danger = False,
         verbose = True):
         """
@@ -127,7 +128,9 @@ def Fit(gal_dict,
                     A boolean, stating whether the full posterior distribution of each parameter should be
                     returned, or just the summary of median, credible interval, etc
             mle_only:
-                    A boolean, which requests that only a Quick Maximum Likelihood estimation be performed.
+                    A boolean, which requests that only a quick Maximum Likelihood Estimation be performed.
+            map_only:
+                    A boolean, which requests that only a quick Maximum A Postiori estimation be performed.
             danger:
                     A boolean, which if True will prioritise speed over caution (enabling the emcee live_dangerously
                     kwarg, and scatting the initial positions of the walkers a bit less)
@@ -208,10 +211,21 @@ def Fit(gal_dict,
 
         # If only MLE fit was requested, return results now
         if mle_only:
+            if map_only:
+                raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
             return {'mle':mle_params}
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+
+        # Find Maximum A Postiori (MAP) estimate
+        if map_only:
+            if verbose:
+                print(name_bracket_prefix + 'Performing MAP estimation')
+            NegLnLike = lambda *args: -LnPost(*args)
+            map_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+            map_params = map_opt.x
+            return {'map':map_params}
 
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(mle_params, fit_dict)
