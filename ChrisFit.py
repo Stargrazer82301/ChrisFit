@@ -194,7 +194,7 @@ def Fit(gal_dict,
                 print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
 
 
-        # Generate initial guess values for maximum-likelihood estimation (which will then itself be used to initialise emcee's estimation)
+        # Generate initial guess values for maximum-likelihood estimation and maximum-a-postiori estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
         mle_fit_dict['bounds'] = True
         mle_fit_dict['correl_unc'] = False
@@ -203,8 +203,6 @@ def Fit(gal_dict,
 
 
         # Find Maximum Likelihood Estimate (MLE)
-        if verbose:
-            print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnLike(*args)
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         mle_params = mle_opt.x
@@ -219,16 +217,16 @@ def Fit(gal_dict,
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
         # Find Maximum A Postiori (MAP) estimate
+        if verbose:
+            print(name_bracket_prefix + 'Performing maximum-a-postiori estimation to initialise MCMC')
+        NegLnLike = lambda *args: -LnPost(*args)
+        map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+        map_params = map_opt.x
         if map_only:
-            if verbose:
-                print(name_bracket_prefix + 'Performing MAP estimation')
-            NegLnLike = lambda *args: -LnPost(*args)
-            map_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
-            map_params = map_opt.x
             return {'map':map_params}
 
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
-        mcmc_initial = MCMCInitial(mle_params, fit_dict)
+        mcmc_initial = MCMCInitial(map_params, fit_dict)
 
         # Initiate and run emcee affine-invariant ensemble sampler
         mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers,
@@ -317,9 +315,9 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         if full_posterior:
-            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'sampler':mcmc_sampler,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
+            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'map':map_params,'sampler':mcmc_sampler,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
         else:
-            return {'medians':median_params,'mle':mle_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
+            return {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
 
 
 
