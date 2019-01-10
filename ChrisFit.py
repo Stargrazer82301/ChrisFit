@@ -211,6 +211,12 @@ def Fit(gal_dict,
         if mle_only:
             if map_only:
                 raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
+            if plot != False:
+                sed_fig, sed_ax = SEDborn(mle_params, fit_dict)
+                if isinstance(plot, str):
+                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
+                else:
+                    sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
             return {'mle':mle_params}
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
@@ -222,8 +228,16 @@ def Fit(gal_dict,
         NegLnLike = lambda *args: -LnPost(*args)
         map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         map_params = map_opt.x
+
+        # If only MAP fit was requested, return results now (with SED plot if needed)
         if map_only:
-            return {'map':map_params}
+            if plot != False:
+                sed_fig, sed_ax = SEDborn(map_params, fit_dict)
+                if isinstance(plot, str):
+                    sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
+                else:
+                    sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
+            return {'map':map_params,'sed':sed_fig}
 
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(map_params, fit_dict)
