@@ -1050,6 +1050,12 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
     else:
         trans_dict = PrefetchColourCorrections()
 
+    # Make sure bands and wavelengths are in list format, for easy iterating later
+    if isinstance(wavelengths, pd.core.series.Series):
+        wavelengths = wavelengths.values.tolist()
+    if isinstance(bands, pd.core.series.Series):
+        bands = bands.values.tolist()
+
     # Construct source SED given current proposed model
     source_spec_lambda = np.logspace(-6,-2,5000)
     source_spec = np.array([source_spec_lambda, ModelFlux(source_spec_lambda, temp, mass, 1E6, kappa_0=kappa_0, kappa_0_lambda=kappa_0_lambda, beta=beta)]).transpose()
