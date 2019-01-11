@@ -353,9 +353,12 @@ def LnLike(params, fit_dict):
     bands_flux_pred = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
                                 kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
 
-    # Calculate and apply colour corrections for bands (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
+    # Calculate colour corrections (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
     bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_frame['band'], temp_vector, mass_vector, beta_vector,
                                       kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False, fit_dict=fit_dict)
+
+    # Apply colour corrections (but not for limit bands, as spectrum not necessarily constrained here)
+    bands_col_correct[np.where((fit_dict['bands_frame']['limit']==True) & (fit_dict['bands_frame']['flux']>bands_flux_pred))] = 1.0
     bands_flux_pred *= bands_col_correct
 
     # If there are correlated uncertainty terms, reduce the flux uncertainties to uncorrelated (non-systematic) components, and update predicted fluxes
@@ -1209,12 +1212,19 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
             ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
         ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
 
-    # Colour-correct fluxes according to model being plotted
+    # Calculate predicted fluxes in each band, in order to establish if colour corrections should be applied to bands which are upper limits
+    pred_fluxes = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
+                            kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
+
+    # Colour-correct fluxes according to model being plotted (excluding upper limits where flux is less than limit)
     bands_frame.loc[:,'flux_corr'] = bands_frame['flux'].copy()
     for b in bands_frame.index:
-        colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'],
-                                           temp_vector, mass_vector, beta_vector,
-                                           kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
+        if (bands_frame.loc[b,'limit']) and (pred_fluxes[b] < bands_frame.loc[b,'flux']):
+            colour_corr_factor = 1.0
+        else:
+            colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'],
+                                               temp_vector, mass_vector, beta_vector,
+                                               kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
         bands_frame.loc[b,'flux_corr'] = bands_frame.loc[b,'flux'] * colour_corr_factor
 
 
