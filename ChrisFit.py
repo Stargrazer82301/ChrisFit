@@ -211,13 +211,14 @@ def Fit(gal_dict,
         if mle_only:
             if map_only:
                 raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
+            sed_fig = None
             if plot != False:
                 sed_fig, sed_ax = SEDborn(mle_params, fit_dict)
                 if isinstance(plot, str):
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
                 else:
                     sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
-            return {'mle':mle_params}
+            return {'mle':mle_params,'sed':sed_fig}
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
@@ -231,6 +232,7 @@ def Fit(gal_dict,
 
         # If only MAP fit was requested, return results now (with SED plot if needed)
         if map_only:
+            sed_fig = None
             if plot != False:
                 sed_fig, sed_ax = SEDborn(map_params, fit_dict)
                 if isinstance(plot, str):
