@@ -1088,6 +1088,7 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
         # Check that requested filter is actually in dictionary; if it is grab it, if it isn't return correction factor of 1.0
         if band not in trans_dict:
             factor_result.append(1.0)
+            continue
         else:
             band_filter = trans_dict[band].copy()
             band_filter[:,0] /= 1E6
