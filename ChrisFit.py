@@ -552,7 +552,6 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
-    #flux([250E-6,350E-6,500E-6], [21.7,64.1], [3.92*(10**7.93),3.92*(10**4.72)], 25E6, kappa_0=[0.051,0.051], kappa_0_lambda=[500E-6,500E-6], beta=[2.0,2.0])
     return flux
 
 
@@ -637,8 +636,8 @@ def PriorsConstruct(fit_dict):
 def ParamsExtract(params, fit_dict):
     """ Function to extract SED parameters from params vector (a tuple). Parameter vector is structured:
     (temp_1, temp_2, ..., temp_n, mass_1, mass_2, ..., mass_n,
-    correl_err_1, correl_err_2, ..., correl_err_n, beta_1, beta_2, ..., beta_n);
-    note that beta values are only included if fit_dict['beta_vary'] == True. """
+    correl_err_1, correl_err_2, ..., correl_err_n, beta_1, beta_2, ..., beta_n)
+    Note that beta values are only included if fit_dict['beta_vary'] == True. """
 
     # Initiate and populate dust temperature and dust mass parameter sub-vectors
     temp_vector = []
@@ -1135,10 +1134,7 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
         factor = ref_int / source_int
 
         # Append results to output lists
-        try:
-            factor_result.append(factor)
-        except:
-            pdb.set_trace()
+        factor_result.append(factor)
 
     # Return results (grabbing single values if only one band is being processed)
     if single:
