@@ -1444,6 +1444,10 @@ def CornerPlot(mcmc_samples, params_highlight, fit_dict):
             mcmc_samples[:,i] = np.log10(mcmc_samples[:,i])
             params_highlight[i] = np.log10(params_highlight[i])
 
+    # Remove NaN samples
+    mcmc_samples_good = np.where(np.isnan(np.median(mcmc_samples, axis=1))==False)[0]
+    mcmc_samples = mcmc_samples[mcmc_samples_good,:]
+
     # Plot posterior corner diagrams (with histograms hidden)
     try:
         fig = corner.corner(mcmc_samples, labels=labels, quantiles=[0.16,0.5,0.84], range=[0.995]*len(labels),
