@@ -360,7 +360,9 @@ def LnLike(params, fit_dict):
                                       kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False, fit_dict=fit_dict)
 
     # Apply colour corrections (but not for limit bands, as spectrum not necessarily constrained here)
-    bands_col_correct[np.where((fit_dict['bands_frame']['limit']==True) & (fit_dict['bands_frame']['flux']>bands_flux_pred))] = 1.0
+    no_col_correct = np.where((fit_dict['bands_frame']['limit']==True) & (fit_dict['bands_frame']['flux']>bands_flux_pred))
+    if no_col_correct[0].shape[0] > 0:
+        bands_col_correct[no_col_correct] = 1.0
     bands_flux_pred *= bands_col_correct
 
     # If there are correlated uncertainty terms, reduce the flux uncertainties to uncorrelated (non-systematic) components, and update predicted fluxes
@@ -1086,7 +1088,7 @@ def ColourCorrect(wavelengths, bands, temp, mass, beta, kappa_0=0.051, kappa_0_l
 
         # Check that requested filter is actually in dictionary; if it is grab it, if it isn't return correction factor of 1.0
         if band not in trans_dict:
-            return 1.0
+            factor_result.append(1.0)
         else:
             band_filter = trans_dict[band].copy()
             band_filter[:,0] /= 1E6
