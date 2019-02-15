@@ -161,6 +161,10 @@ def Fit(gal_dict,
         if not hasattr(correl_unc, '__iter__'):
             correl_unc = []
 
+        # If no limit information provided in band frame, assume no bands are limit
+        if 'limit' not in bands_frame.keys():
+            bands_frame['limit'] = np.array([False]*len(bands_frame))
+
         # Bundle various fitting arguments in to a dictionary
         fit_dict = {'bands_frame':bands_frame,
                     'gal_dict':gal_dict,
@@ -467,7 +471,7 @@ def LnPost(params, fit_dict):
 
 
 
-def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0):
+def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6, beta=2.0, break_lambda=False):
     """
     Function to calculate flux at given wavelength(s) from dust component(s) of given mass and temperature, at a given
     distance, assuming modified blackbody ('greybody') emission.
@@ -484,6 +488,9 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
         kappa_0_lambda: A float, or list of floats, giving the reference wavelength (in m) corresponding to each value
                         of kappa_0
         beta:           A float, or list of floats, giving the dust emissivity slope(s), beta, of each dust component
+        break_lambda:   A bool, or float, used to indicate if a broken emissivity modified black body model (BEMBB,
+                        Gordon+ 2014) is to be used. If set to False (the default), then a non-broken model is
+                        used. If set to a float, this wavelength (in m) is used as a break wavelength
 
     If wavelength is given as a list, a list of output fluxes will be given, corresponding to the calculated flux at
     each wavelength.
@@ -496,6 +503,9 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
 
     Optionally, a different dust emissivity slope (ie, beta) can be used for each component; this is done by giving a
     list of length n for beta.
+
+    If a BEMBB is being used (ie, if break_lambda is set to a float), then two beta values must be given; the beta for
+    the shorter and longer wavelengths (relative to the break) respectively.
     """
     # Establish the number of model components
     if hasattr(temp, '__iter__') and hasattr(mass, '__iter__'):
@@ -526,10 +536,36 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     nu = np.divide(c, wavelength)
     nu_0 = np.divide(c, kappa_0_lambda)
 
-    # Calculate kappa for the frequency of each band of interest
-    kappa_nu_base = np.outer(nu_0**-1, nu) # This being the array-wise equivalent of nu/nu_0
-    kappa_nu_prefactor = np.array([ np.power(kappa_nu_base[m,:],beta[m]) for m in range(n_comp) ]) # This expontiates each model component's base term to its corresponding beta
-    kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
+    # Calculate kappa for the frequency of each band of interest, for regular MBB fits
+    if not break_lambda:
+        kappa_nu_base = np.outer(nu_0**-1, nu) # This being the array-wise equivalent of nu/nu_0
+        kappa_nu_prefactor = np.array([ np.power(kappa_nu_base[m,:],beta[m]) for m in range(n_comp) ]) # This expontiates each model component's base term to its corresponding beta
+        kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
+
+    # Alternativey, if BEMBB resquested, first check that correct value types are given
+    elif isinstance(break_lambda, float):
+        if len(beta) != 2:
+            raise Exception('When a break_labmda value is given, two beta values must be provided')
+        if len(kappa_0) > 1:
+            raise Exception('When a break_labmda value is given, only one kappa_0 value can be provided')
+
+        # Shunt our reference kappa to the break wavelength, to stop a discontinuity appearing
+        if kappa_0_lambda < break_lambda:
+            kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[0]
+        elif kappa_0_lambda >= break_lambda:
+            kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[1]
+        break_nu = c / break_lambda
+
+        # Now calculate kappa either side of the break
+        short_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
+        short_kappa_nu_prefactor = np.power(short_kappa_nu_base, beta[0])
+        short_kappa_nu = kappa_break_lambda * short_kappa_nu_prefactor
+        long_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
+        long_kappa_nu_prefactor = np.power(long_kappa_nu_base, beta[1])
+        long_kappa_nu = kappa_break_lambda * long_kappa_nu_prefactor
+        kappa_nu = short_kappa_nu.copy()
+        kappa_nu[np.where(wavelength >= break_lambda)] = long_kappa_nu[np.where(wavelength >= break_lambda)]
+        kappa_nu = np.array([kappa_nu])
 
     # Calculate Planck function prefactor for each frequency
     B_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
