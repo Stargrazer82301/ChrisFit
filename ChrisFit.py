@@ -547,11 +547,15 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
         if len(beta) != 2:
             raise Exception('When a break_labmda value is given, two beta values must be provided')
         if len(kappa_0) > 1:
-            raise Exception('When a break_labmda value is given, only one kappa_0 value can be provided')
+            if (kappa_0.std() > 0) or (kappa_0_lambda.std() > 0):
+                raise Exception('When a break_labmda value is given, all dust components must be given same kappa_0')
+            else:
+                kappa_0 = kappa_0.mean()
+                kappa_0_lambda = kappa_0_lambda.mean()
 
         # Shunt our reference kappa to the break wavelength, to stop a discontinuity appearing
         if kappa_0_lambda < break_lambda:
-            kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[0]
+            kappa_break_lambda = kappa_0.mean() * (kappa_0_lambda/break_lambda)**beta[0]
         elif kappa_0_lambda >= break_lambda:
             kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[1]
         break_nu = c / break_lambda
@@ -565,7 +569,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
         long_kappa_nu = kappa_break_lambda * long_kappa_nu_prefactor
         kappa_nu = short_kappa_nu.copy()
         kappa_nu[np.where(wavelength >= break_lambda)] = long_kappa_nu[np.where(wavelength >= break_lambda)]
-        kappa_nu = np.array([kappa_nu])
+        kappa_nu = np.array([kappa_nu]*n_comp)
 
     # Calculate Planck function prefactor for each frequency
     B_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
