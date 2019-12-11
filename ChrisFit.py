@@ -335,17 +335,16 @@ def Fit(gal_dict,
         else:
             sed_fig = None
 
-
         # Return results
         gc.collect()
         if mcmc_n_threads > 1:
             mcmc_sampler.pool.terminate()
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
+        results_dict = {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig,'chisq':median_chi_squared}
         if full_posterior:
-            return {'posterior':mcmc_samples,'medians':median_params,'mle':mle_params,'map':map_params,'sampler':mcmc_sampler,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
-        else:
-            return {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig}
+            results_dict = results_dict.update({'posterior':mcmc_samples, 'trace':trace_fig})
+        return results_dict
 
 
 
@@ -1404,7 +1403,6 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
                                         kappa_0=med_fit_dict['kappa_0'], kappa_0_lambda=med_fit_dict['kappa_0_lambda'], beta=med_beta_vector[i])
         med_fit_fluxes_tot = np.sum(med_fit_fluxes, axis=0)
         temp_vector, mass_vector, beta_vector = med_temp_vector, med_mass_vector, med_beta_vector
-
 
         # Plot "median model"
         for i in range(med_fit_dict['components']):
