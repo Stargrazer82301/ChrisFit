@@ -194,7 +194,7 @@ def Fit(gal_dict,
         elif mcmc_n_threads == 1:
             fit_dict['priors'] = PriorsConstruct(fit_dict)
         else:
-            if verbose:
+            if verbose and (True not in [mle_only, map_only]):
                 print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
 
 
@@ -207,6 +207,11 @@ def Fit(gal_dict,
 
 
         # Find Maximum Likelihood Estimate (MLE)
+        if verbose:
+            if map_only:
+                print(name_bracket_prefix + 'Performing maximum likelihood estimation')
+            else:
+                print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise maximum-a-posteriori estimation')
         NegLnLike = lambda *args: -LnLike(*args)
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         mle_params = mle_opt.x
@@ -217,6 +222,7 @@ def Fit(gal_dict,
                 raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
             sed_fig = None
             if plot != False:
+                print(name_bracket_prefix + 'Generating SED plot')
                 sed_fig, sed_ax = SEDborn(mle_params, fit_dict)
                 if isinstance(plot, str):
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
@@ -229,7 +235,10 @@ def Fit(gal_dict,
 
         # Find Maximum A Postiori (MAP) estimate
         if verbose:
-            print(name_bracket_prefix + 'Performing maximum-a-postiori estimation to initialise MCMC')
+            if map_only:
+                print(name_bracket_prefix + 'Performing maximum-a-postiori estimation')
+            else:
+                print(name_bracket_prefix + 'Performing maximum-a-postiori estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnPost(*args)
         map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         map_params = map_opt.x
@@ -238,6 +247,7 @@ def Fit(gal_dict,
         if map_only:
             sed_fig = None
             if plot != False:
+                print(name_bracket_prefix + 'Generating SED plot')
                 sed_fig, sed_ax = SEDborn(map_params, fit_dict)
                 if isinstance(plot, str):
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
