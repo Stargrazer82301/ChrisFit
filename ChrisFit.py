@@ -220,6 +220,7 @@ def Fit(gal_dict,
         if mle_only:
             if map_only:
                 raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
+            chi_squared = ChiSquared(mle_params, fit_dict)
             sed_fig = None
             if plot != False:
                 print(name_bracket_prefix + 'Generating SED plot')
@@ -228,7 +229,7 @@ def Fit(gal_dict,
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
                 else:
                     sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
-            return {'mle':mle_params,'sed':sed_fig}
+            return {'mle':mle_params,'sed':sed_fig,'chisq':chi_squared}
 
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
@@ -245,6 +246,7 @@ def Fit(gal_dict,
 
         # If only MAP fit was requested, return results now (with SED plot if needed)
         if map_only:
+            chi_squared = ChiSquared(map_params, fit_dict)
             sed_fig = None
             if plot != False:
                 print(name_bracket_prefix + 'Generating SED plot')
@@ -253,7 +255,7 @@ def Fit(gal_dict,
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
                 else:
                     sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
-            return {'map':map_params,'sed':sed_fig}
+            return {'map':map_params,'sed':sed_fig,'chisq':chi_squared}
 
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(map_params, fit_dict)
@@ -304,8 +306,10 @@ def Fit(gal_dict,
         mcmc_samples = mcmc_samples[np.where(np.isnan(mcmc_samples[:,0])==False)[0],:]
         mcmc_samples = np.delete(mcmc_samples, list(set(np.where(np.isnan(mcmc_samples))[0].tolist())), axis=0)
 
-        # Find median parameter estimates
+        # Find median parameter estimates, and calculate corresponding chi-squared
         median_params = np.median(mcmc_samples, axis=0)
+        temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(median_params, fit_dict)
+        median_chi_squared = ChiSquared(median_params, fit_dict)
 
         # Plot posterior corner plot
         if plot != False:
@@ -1332,13 +1336,6 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     else:
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']], yerr=[errorbar_down[bands_frame['limit']], errorbar_up[bands_frame['limit']]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
-
-
-
-    # Calculate residuals and chi-squared
-    flux_resid = flux_plot - ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector[i])
-    chi = (flux_resid / bands_frame['error'])[bands_frame['limit']==False]
-    chi_squared = chi**2
 
 
 
