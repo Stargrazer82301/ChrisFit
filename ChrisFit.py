@@ -1226,6 +1226,40 @@ def Numpify(var, n_target=False):
 
 
 
+def ChiSquared(params, fit_dict):
+    """ Function to calculate residuals, and thence chi-squared, of model, accounting for colour corrections """
+
+    # Extract required parameters
+    bands_frame = fit_dict['bands_frame']
+    temp_vector, mass_vector, beta_vector, correl_err_vector = ParamsExtract(params, fit_dict)
+
+    # Calculate predicted fluxes in each band, in order to establish if colour corrections should be applied to bands which are upper limits
+    pred_fluxes = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
+                            kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
+
+    # Apply colour corrections for observed fluxes, given model
+    flux_corr = bands_frame['flux'].copy()
+    for b in bands_frame.index:
+        if (bands_frame.loc[b,'limit']) and (pred_fluxes[b] < bands_frame.loc[b,'flux']):
+            colour_corr_factor = 1.0
+        else:
+            colour_corr_factor = ColourCorrect(bands_frame.loc[b,'wavelength'], bands_frame.loc[b,'band'],
+                                               temp_vector, mass_vector, beta_vector,
+                                               kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
+        flux_corr[b] = bands_frame.loc[b,'flux'] * colour_corr_factor
+
+    # Calcylate residuals, and thence chi-squared
+    flux_resid = flux_corr - ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'], kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
+    chi = (flux_resid / bands_frame['error'])[bands_frame['limit']==False]
+    chi_squared = chi**2
+
+    # Return result
+    return chi_squared
+
+
+
+
+
 def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     """ Function to plot an SED, with the same information used to produce fit """
 
