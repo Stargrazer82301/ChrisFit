@@ -1372,7 +1372,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
             med_fit_fluxes[i,:] = ModelFlux(med_fit_wavelengths, med_temp_vector[i], med_mass_vector[i], med_fit_dict['distance'],
                                         kappa_0=med_fit_dict['kappa_0'], kappa_0_lambda=med_fit_dict['kappa_0_lambda'], beta=med_beta_vector[i])
         med_fit_fluxes_tot = np.sum(med_fit_fluxes, axis=0)
-        temp_vector, mass_vector, beta_vector, correl_err_vector = med_temp_vector, med_mass_vector, med_beta_vector, med_correl_err_vector
+        temp_vector, mass_vector, beta_vector = med_temp_vector, med_mass_vector, med_beta_vector
 
 
         # Plot "median model"
