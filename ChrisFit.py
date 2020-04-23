@@ -556,7 +556,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
         kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
 
     # Alternativey, if BEMBB resquested, first check that correct value types are given
-    elif isinstance(break_lambda, float):
+    elif isinstance(break_lambda, (np.floating, float)):
         if len(beta) != 2:
             raise Exception('When a break_labmda value is given, two beta values must be provided')
         if len(kappa_0) > 1:
