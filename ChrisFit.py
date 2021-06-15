@@ -218,11 +218,11 @@ def Fit(gal_dict,
         if mle_only:
             if map_only:
                 raise Exception('Cannot have both mle_only and map_only kwargs set to true; chose one or the other')
-            chi_squared = ChiSquared(mle_params, fit_dict)
+            chi_squared = ChiSquared(mle_params, mle_fit_dict)
             sed_fig = None
             if plot != False:
                 print(name_bracket_prefix + 'Generating SED plot')
-                sed_fig, sed_ax = SEDborn(mle_params, fit_dict)
+                sed_fig, sed_ax = SEDborn(mle_params, mle_fit_dict)
                 if isinstance(plot, str):
                     sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
                 else:
