@@ -1426,7 +1426,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         mass_2_value_string = r',   M$_{w}$ = '+str(np.around(np.log10(mass_vector[1]), decimals=2))[0:5]
         mass_tot_value_string = r'M$_{d}$ = '+str(np.around(np.log10(np.sum(mass_vector)), decimals=2))[0:5]
     if (fit_dict['beta_vary'] == True) and (len(fit_dict['beta']) == 1):
-        beta_1_value_string = r'$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]+',   '
+        beta_1_value_string = r'$\beta$ = '+str(np.around(beta_vector[0], decimals=2))[0:4]+'   '
     else:
         beta_1_value_string = r''
 
