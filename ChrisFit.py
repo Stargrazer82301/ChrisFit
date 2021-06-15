@@ -672,9 +672,10 @@ def PriorsConstruct(fit_dict):
     # Create beta priors, using gamma distribution
     if fit_dict['beta_vary']:
         #beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3.00, loc=0, scale=1))
-        beta_like = lambda beta: scipy.stats.gamma.pdf(beta, 3.00, loc=0, scale=1)
-        beta_x = np.logspace(0, 20, num=500)
-        beta_y = mass_like(beta_x)
+        beta_mode = 1.75
+        beta_like = lambda beta: scipy.stats.gamma.pdf(beta, beta_mode+1.0, loc=0, scale=1)
+        beta_x = np.linspace(0, 20, num=2000)
+        beta_y = beta_like(beta_x)
         beta_norm = np.trapz(beta_y, x=beta_x)
         beta_like_norm = lambda beta, beta_like=beta_like: beta_like(beta) / beta_norm
         beta_ln_like = lambda beta, beta_like_norm=beta_like_norm: np.log(beta_like_norm(beta))
