@@ -258,12 +258,15 @@ def Fit(gal_dict,
         # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
         mcmc_initial = MCMCInitial(map_params, fit_dict)
 
+        # Initialise multiprocessing pool
+        mcmc_pool = mp.Pool(processes=mcmc_n_threads)
+
         # Initiate and run emcee affine-invariant ensemble sampler
         mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers,
                                              n_params,
                                              LnPost,
                                              args=[fit_dict],
-                                             threads=mcmc_n_threads,
+                                             pool=mcmc_pool,
                                              live_dangerously=danger)
         if verbose:
             print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
@@ -336,7 +339,7 @@ def Fit(gal_dict,
         # Return results
         gc.collect()
         if mcmc_n_threads > 1:
-            mcmc_sampler.pool.terminate()
+            mcmc_pool.close()
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
         results_dict = {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig,'chisq':median_chi_squared}
