@@ -843,9 +843,10 @@ def MCMCInitial(mle_params, fit_dict):
             params = copy.deepcopy(mle_params)
             params[len(mle_temp_vector):len(mle_temp_vector+mle_mass_vector)] = np.log10(params[len(mle_temp_vector):len(mle_temp_vector+mle_mass_vector)])
 
-            # Generate permutations for walker initial positions of +/- 20%, with additional +/- 0.001 random shift
+            # Generate permutations for walker initial positions of +/- 5%, with additional +/- 0.001 (or 0.5%, whichever is smaller) random shift
             walker_scale = 0.05 * params * np.random.rand(len(params))
             walker_offset = 1E-3 * np.random.rand(len(params))
+            walker_offset = np.min(np.array([walker_offset, 0.005 * params * np.random.rand(len(params))]).transpose(), axis=1)
 
             # Apply initial position permutations
             walker_initial = (params + walker_scale + walker_offset)
