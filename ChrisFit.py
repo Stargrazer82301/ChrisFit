@@ -349,7 +349,7 @@ def Fit(gal_dict,
             print(name_bracket_prefix + 'Processing completed')
         results_dict = {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig,'chisq':median_chi_squared}
         if full_posterior:
-            results_dict = results_dict.update({'posterior':mcmc_samples, 'trace':trace_fig})
+            results_dict.update({'posterior':mcmc_samples, 'trace':trace_fig})
         return results_dict
 
 
