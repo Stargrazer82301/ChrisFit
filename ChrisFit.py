@@ -144,8 +144,13 @@ def Fit(gal_dict,
         if verbose:
             print(name_bracket_prefix  + 'Commencing processing')
 
-        # Add column to bands_frame, to record which fluxes are larger than their uncertainty
-        bands_frame['det'] = bands_frame.loc[:,'flux'] > bands_frame.loc[:,'error']
+        # If all fluxes are negative, raise exception
+        if np.where(bands_frame.loc[:,'flux'] > 0)[0].shape[0]:
+            raise Exception('All fluxes are negative; fitting not realistic')
+
+        # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
+        if len(beta) != 2:
+            raise Exception('Beta argument must contain two values for fittin BEMBB model')
 
         # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
         if not hasattr(beta, '__iter__'):
