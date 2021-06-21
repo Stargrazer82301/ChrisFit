@@ -1482,8 +1482,13 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     ax.set_xlim(xlim_min,xlim_max)
 
     # Scale y-axes to account for range of values and non-detections
-    ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[bands_frame['det']] - error_plot[bands_frame['det']] ) ) ) )
-    ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot[bands_frame['det']] + error_plot[bands_frame['det']] ) ) ) )
+    if sum(bands_frame['det']) > 0:
+        ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[bands_frame['det']] - error_plot[bands_frame['det']] ) ) ) )
+        ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot[bands_frame['det']] + error_plot[bands_frame['det']] ) ) ) )
+    else:
+        flux_where_pos = np.where(flux_plot > 0)
+        ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[flux_where_pos] / 2.0 ) ) ) )
+        ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot + error_plot ) ) ) )
     ax.set_ylim(ylim_min,ylim_max)
 
     # Format figure axes and labels
