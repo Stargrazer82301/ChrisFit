@@ -45,7 +45,7 @@ correl_unc = [{'correl_bands':['SPIRE_250','SPIRE_350','SPIRE_500'],
                'correl_distr':SpireCorrelUnc}]
 
 # State output directory
-out_dir = 'Output_BEMBB/'
+out_dir = 'Output/'
 
 # Call ChrisFit
 posterior = ChrisFitBEMBB.FitBEMBB(gal_dict,
