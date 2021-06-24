@@ -235,11 +235,17 @@ def FitBEMBB(gal_dict,
         else:
             print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation to initialise MCMC')
     NegLnLike = lambda *args: -LnPost(*args)
+
     map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
-    map_params = map_opt.x
+    if map_opt['success'] == True:
+        map_params = map_opt.x
+    else:
+        map_params = mle_params
 
     # If only MAP fit was requested, return results now (with SED plot if needed)
     if map_only:
+        if map_opt['success'] == False:
+            raise Exception('Maximum A-Posteriori estimation failed; uncertainties may be too small?')
         chi_squared = ChiSquared(map_params, fit_dict)
         sed_fig = None
         if plot != False:
