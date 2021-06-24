@@ -122,7 +122,7 @@ def FitBEMBB(gal_dict,
         mle_only:
                 A boolean, which requests that only a quick Maximum Likelihood Estimation be performed.
         map_only:
-                A boolean, which requests that only a quick Maximum A Postiori estimation be performed.
+                A boolean, which requests that only a quick Maximum A posteriori estimation be performed.
         danger:
                 A boolean, which if True will prioritise speed over caution (enabling the emcee live_dangerously
                 kwarg, and scatting the initial positions of the walkers a bit less)
@@ -192,7 +192,7 @@ def FitBEMBB(gal_dict,
             print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
 
 
-    # Generate initial guess values for maximum-likelihood estimation and maximum-a-postiori estimation (which will then itself be used to initialise emcee's estimation)
+    # Generate initial guess values for maximum-likelihood estimation and maximum-a-posteriori estimation (which will then itself be used to initialise emcee's estimation)
     mle_fit_dict = copy.deepcopy(fit_dict)
     mle_fit_dict['bounds'] = True
     mle_fit_dict['correl_unc'] = False
@@ -228,12 +228,12 @@ def FitBEMBB(gal_dict,
     # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
     mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
-    # Find Maximum A Postiori (MAP) estimate
+    # Find Maximum A posteriori (MAP) estimate
     if verbose:
         if map_only:
-            print(name_bracket_prefix + 'Performing maximum-a-postiori estimation')
+            print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation')
         else:
-            print(name_bracket_prefix + 'Performing maximum-a-postiori estimation to initialise MCMC')
+            print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation to initialise MCMC')
     NegLnLike = lambda *args: -LnPost(*args)
     map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
     map_params = map_opt.x
@@ -1506,8 +1506,8 @@ def Autocorr(mcmc_chains, fit_dict):
     temp_palettes = ['PuBu']
     mass_palettes = ['BuPu']
     beta_palettes = ['GnBu', 'YlGnBu']
-    correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
-    break_lambda_palettes = ['RdPu']
+    correl_err_palettes = ['YlOrBr', 'OrRd']#, 'YlOrRd']
+    break_lambda_palettes = ['PuRd']
 
     # Create dummy parameter vectors, just to find out how many parameters there are
     temp_vector, mass_vector, beta_vector, break_lambda_vector, correl_err_vector = ParamsExtract(mcmc_chains[0,0,:], fit_dict)
