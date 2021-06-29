@@ -205,7 +205,7 @@ def FitBEMBB(gal_dict,
         if map_only:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation')
         else:
-            print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise maximum-a-posteriori estimation')
+            print(name_bracket_prefix + 'Performing max-like estimation to initialise MaP estimation')
     NegLnLike = lambda *args: -LnLike(*args)
     mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
     mle_params = mle_opt.x
@@ -233,7 +233,7 @@ def FitBEMBB(gal_dict,
         if map_only:
             print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation')
         else:
-            print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation to initialise MCMC')
+            print(name_bracket_prefix + 'Performing MaP estimation to initialise MCMC')
     NegLnLike = lambda *args: -LnPost(*args)
 
     map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
@@ -245,7 +245,7 @@ def FitBEMBB(gal_dict,
     # If only MAP fit was requested, return results now (with SED plot if needed)
     if map_only:
         if map_opt['success'] == False:
-            raise Exception('Maximum A-Posteriori estimation failed; uncertainties may be too small?')
+            raise Exception('MaP estimation failed; uncertainties may be too small?')
         chi_squared = ChiSquared(map_params, fit_dict)
         sed_fig = None
         if plot != False:

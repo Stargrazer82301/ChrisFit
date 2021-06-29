@@ -214,7 +214,7 @@ def Fit(gal_dict,
             if map_only:
                 print(name_bracket_prefix + 'Performing maximum likelihood estimation')
             else:
-                print(name_bracket_prefix + 'Performing maximum likelihood estimation to initialise maximum-a-posteriori estimation')
+                print(name_bracket_prefix + 'Performing max-like estimation to initialise MaP estimation')
         NegLnLike = lambda *args: -LnLike(*args)
         mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         mle_params = mle_opt.x
@@ -240,9 +240,9 @@ def Fit(gal_dict,
         # Find Maximum A posteriori (MAP) estimate
         if verbose:
             if map_only:
-                print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation')
+                print(name_bracket_prefix + 'Performing MaP estimation')
             else:
-                print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation to initialise MCMC')
+                print(name_bracket_prefix + 'Performing MaP estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnPost(*args)
         map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
         map_params = map_opt.x
