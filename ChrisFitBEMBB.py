@@ -205,7 +205,7 @@ def FitBEMBB(gal_dict,
         if map_only:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation')
         else:
-            print(name_bracket_prefix + 'Performing max-like estimation to initialise MaP estimation')
+            print(name_bracket_prefix + 'Performing MLE to initialise MaP estimation')
     NegLnLike = lambda *args: -LnLike(*args)
     mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':5000,'maxfev':5000})
     mle_params = mle_opt.x
