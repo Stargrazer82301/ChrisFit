@@ -207,7 +207,7 @@ def FitBEMBB(gal_dict,
         else:
             print(name_bracket_prefix + 'Performing max-like estimation to initialise MaP estimation')
     NegLnLike = lambda *args: -LnLike(*args)
-    mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+    mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':5000,'maxfev':5000})
     mle_params = mle_opt.x
 
     # If only MLE fit was requested, return results now
@@ -236,7 +236,7 @@ def FitBEMBB(gal_dict,
             print(name_bracket_prefix + 'Performing MaP estimation to initialise MCMC')
     NegLnLike = lambda *args: -LnPost(*args)
 
-    map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+    map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-3, options={'maxiter':2500,'maxfev':2500})
     if map_opt['success'] == True:
         map_params = map_opt.x
     else:
@@ -1512,8 +1512,8 @@ def Autocorr(mcmc_chains, fit_dict):
     temp_palettes = ['PuBu']
     mass_palettes = ['BuPu']
     beta_palettes = ['GnBu', 'YlGnBu']
-    correl_err_palettes = ['YlOrBr', 'OrRd']#, 'YlOrRd']
-    break_lambda_palettes = ['PuRd']
+    correl_err_palettes = ['YlOrBr', 'PuRd']#, 'YlOrRd']
+    break_lambda_palettes = ['OrRd']
 
     # Create dummy parameter vectors, just to find out how many parameters there are
     temp_vector, mass_vector, beta_vector, break_lambda_vector, correl_err_vector = ParamsExtract(mcmc_chains[0,0,:], fit_dict)
@@ -1579,8 +1579,8 @@ def TracePlot(mcmc_chains, fit_dict):
     temp_palettes = ['PuBu']
     mass_palettes = ['BuPu']
     beta_palettes = ['GnBu', 'YlGnBu']
-    correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
     break_lambda_palettes = ['RdPu']
+    correl_err_palettes = ['YlOrRd', 'OrRd', 'YlOrBr']
 
     # Create dummy parameter vectors, just to find out how many parameters there are
     temp_vector, mass_vector, beta_vector, break_lambda_vector, correl_err_vector = ParamsExtract(mcmc_chains[0,0,:], fit_dict)
@@ -1589,8 +1589,8 @@ def TracePlot(mcmc_chains, fit_dict):
     temp_palettes = np.repeat(temp_palettes, int(np.ceil(float(len(temp_vector))/float(len(temp_palettes))))).tolist()[:len(temp_vector)]
     mass_palettes = np.repeat(mass_palettes, int(np.ceil(float(len(mass_vector))/float(len(mass_palettes))))).tolist()[:len(mass_vector)]
     beta_palettes = np.repeat(beta_palettes, int(np.ceil(float(len(fit_dict['beta']))/float(len(beta_palettes))))).tolist()[:len(fit_dict['beta'])]
-    correl_err_palettes = np.repeat(correl_err_palettes, int(np.ceil(float(len(correl_err_vector))/float(len(correl_err_palettes))))).tolist()[:len(correl_err_vector)]
     break_lambda_palettes = np.repeat(break_lambda_palettes, int(np.ceil(float(len(break_lambda_vector))/float(len(break_lambda_palettes))))).tolist()[:len(break_lambda_vector)]
+    correl_err_palettes = np.repeat(correl_err_palettes, int(np.ceil(float(len(correl_err_vector))/float(len(correl_err_palettes))))).tolist()[:len(correl_err_vector)]
     palettes = temp_palettes + mass_palettes + beta_palettes + correl_err_palettes + break_lambda_palettes
 
     # Generate figure, with subplot for each parameter
