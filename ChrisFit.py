@@ -267,6 +267,8 @@ def Fit(gal_dict,
         mcmc_pool = mp.Pool(processes=mcmc_n_threads)
 
         # Initiate and run emcee affine-invariant ensemble sampler
+        if verbose:
+            print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
         mcmc_sampler = emcee.EnsembleSampler(mcmc_n_walkers,
                                              n_params,
                                              LnPost,
@@ -274,7 +276,6 @@ def Fit(gal_dict,
                                              pool=mcmc_pool,
                                              live_dangerously=danger)
         if verbose:
-            print(name_bracket_prefix + 'Sampling posterior distribution using emcee')
             mcmc_bar = progress.bar.Bar('Computing MCMC',
                                         max=mcmc_n_steps,
                                         fill='=',
