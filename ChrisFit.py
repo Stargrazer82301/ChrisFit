@@ -149,10 +149,6 @@ def Fit(gal_dict,
             raise Exception('All fluxes are negative; fitting not realistic')
 
         # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
-        if len(beta) != 2:
-            raise Exception('Beta argument must contain two values for fittin BEMBB model')
-
-        # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
         if not hasattr(beta, '__iter__'):
             beta = np.array([beta])
         if len(beta) == 1 and components > 1:
