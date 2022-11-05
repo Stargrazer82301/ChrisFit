@@ -148,6 +148,9 @@ def Fit(gal_dict,
         if np.where(bands_frame.loc[:,'flux'] > 0)[0].shape[0] == 0:
             raise Exception('All fluxes are negative; fitting not realistic')
 
+        # Add column to bands_frame, to record which fluxes are larger than their uncertainty
+        bands_frame['det'] = bands_frame.loc[:,'flux'] > bands_frame.loc[:,'error']
+
         # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
         if not hasattr(beta, '__iter__'):
             beta = np.array([beta])
