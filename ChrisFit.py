@@ -609,7 +609,7 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     if flux.size == 0:
         flux = flux[0]
     else:
-        flux = flux.astyle(float)
+        flux = flux.astype(float)
     return flux
 
 
