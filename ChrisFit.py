@@ -145,7 +145,7 @@ def Fit(gal_dict,
             print(name_bracket_prefix  + 'Commencing processing')
 
         # If all fluxes are negative, raise exception
-        if np.where(bands_frame.loc[:,'flux'] > 0)[0].shape[0]:
+        if np.where(bands_frame.loc[:,'flux'] > 0)[0].shape[0] == 0:
             raise Exception('All fluxes are negative; fitting not realistic')
 
         # Parse beta argument, so that each model component is assigned its own value (even if they are all the same)
@@ -608,6 +608,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
+    else:
+        flux = flux.astyle(float)
     return flux
 
 
@@ -1066,7 +1068,7 @@ def Geweke(mcmc_chain, test_intrv=100, comp_frac=0.4):
 
 def PrefetchColourCorrections():
     """ Function to read in a data file containing instrumental response curves, and descritions of reference spectra,
-    containging this information for all the bands where colour corrections are desired. The format should be:
+    containing this information for all the bands where colour corrections are desired. The format should be:
     The first row for a given band takes form 'band,[BAND NAME]'.
     The following row for a given band provides a description of that band's calibration reference spectrum, taking
         the form 'ref,[SPECTRUM_DESCRIPTION]'; the spectrum description can be either nu_X, where X is replaced by a
