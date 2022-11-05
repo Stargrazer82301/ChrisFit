@@ -1484,8 +1484,8 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
 
     # Scale x-axes to account for wavelengths provided
-    xlim_min = 1E6 * 10.0**( np.floor( np.log10( np.min( bands_frame['wavelength'] ) ) ) )
-    xlim_max = 1E6 * 10.0**( np.ceil( np.log10( np.max( bands_frame['wavelength'] ) ) ) )
+    xlim_min = 1E6 * 10.0**( np.floor( np.log10( np.min( bands_frame['wavelength'] ) ) - 0.1 ) )
+    xlim_max = 1E6 * 10.0**( np.ceil( np.log10( np.max( bands_frame['wavelength'] ) ) + 0.1 ) )
     ax.set_xlim(xlim_min,xlim_max)
 
     # Scale y-axes to account for range of values and non-detections
