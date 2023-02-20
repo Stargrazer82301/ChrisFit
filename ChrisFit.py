@@ -378,6 +378,10 @@ def LnLike(params, fit_dict):
     bands_flux_pred = ModelFlux(bands_frame['wavelength'], temp_vector, mass_vector, fit_dict['distance'],
                                 kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], beta=beta_vector)
 
+    # Return -inf ln-likelihood if predicted fluxes are bad (happens due to overflow errors for large exponents)
+    if -np.inf in bands_flux_pred:
+        return -np.inf
+
     # Calculate colour corrections (doing this before correlated uncertainties, as colour corrections are calibrated assuming Neptune model is correct)
     bands_col_correct = ColourCorrect(bands_frame['wavelength'], bands_frame['band'], temp_vector, mass_vector, beta_vector,
                                       kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False, fit_dict=fit_dict)
@@ -555,58 +559,68 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     nu = np.divide(c, wavelength)
     nu_0 = np.divide(c, kappa_0_lambda)
 
-    # Calculate kappa for the frequency of each band of interest, for regular MBB fits
-    if not break_lambda:
-        kappa_nu_base = np.outer(nu_0**-1, nu) # This being the array-wise equivalent of nu/nu_0
-        kappa_nu_prefactor = np.array([ np.power(kappa_nu_base[m,:],beta[m]) for m in range(n_comp) ]) # This expontiates each model component's base term to its corresponding beta
-        kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
+    # Run all this in a try statement, to catch overflow errors from too-large numbers being expontiated
+    try:
 
-    # Alternativey, if BEMBB resquested, first check that correct value types are given
-    elif isinstance(break_lambda, (np.floating, float)):
-        if len(beta) != 2:
-            raise Exception('When a break_labmda value is given, two beta values must be provided')
-        if len(kappa_0) > 1:
-            if (kappa_0.std() > 0) or (kappa_0_lambda.std() > 0):
-                raise Exception('When a break_labmda value is given, all dust components must be given same kappa_0')
-            else:
-                kappa_0 = kappa_0.mean()
-                kappa_0_lambda = kappa_0_lambda.mean()
+        # Calculate kappa for the frequency of each band of interest, for regular MBB fits
+        if not break_lambda:
+            kappa_nu_base = np.outer(nu_0**-1, nu) # This being the array-wise equivalent of nu/nu_0
+            kappa_nu_prefactor = np.array([ np.power(kappa_nu_base[m,:],beta[m]) for m in range(n_comp) ]) # This expontiates each model component's base term to its corresponding beta
+            kappa_nu = np.array([ np.multiply(kappa_0[m],kappa_nu_prefactor[m,:]) for m in range(n_comp) ])
 
-        # Shunt our reference kappa to the break wavelength, to stop a discontinuity appearing
-        if kappa_0_lambda < break_lambda:
-            kappa_break_lambda = kappa_0.mean() * (kappa_0_lambda/break_lambda)**beta[0]
-        elif kappa_0_lambda >= break_lambda:
-            kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[1]
-        break_nu = c / break_lambda
+        # Alternativey, if BEMBB resquested, first check that correct value types are given
+        elif isinstance(break_lambda, (np.floating, float)):
+            if len(beta) != 2:
+                raise Exception('When a break_labmda value is given, two beta values must be provided')
+            if len(kappa_0) > 1:
+                if (kappa_0.std() > 0) or (kappa_0_lambda.std() > 0):
+                    raise Exception('When a break_labmda value is given, all dust components must be given same kappa_0')
+                else:
+                    kappa_0 = kappa_0.mean()
+                    kappa_0_lambda = kappa_0_lambda.mean()
 
-        # Now calculate kappa either side of the break
-        short_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
-        short_kappa_nu_prefactor = np.power(short_kappa_nu_base, beta[0])
-        short_kappa_nu = kappa_break_lambda * short_kappa_nu_prefactor
-        long_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
-        long_kappa_nu_prefactor = np.power(long_kappa_nu_base, beta[1])
-        long_kappa_nu = kappa_break_lambda * long_kappa_nu_prefactor
-        kappa_nu = short_kappa_nu.copy()
-        kappa_nu[np.where(wavelength >= break_lambda)] = long_kappa_nu[np.where(wavelength >= break_lambda)]
-        kappa_nu = np.array([kappa_nu]*n_comp)
+            # Shunt our reference kappa to the break wavelength, to stop a discontinuity appearing
+            if kappa_0_lambda < break_lambda:
+                kappa_break_lambda = kappa_0.mean() * (kappa_0_lambda/break_lambda)**beta[0]
+            elif kappa_0_lambda >= break_lambda:
+                kappa_break_lambda = kappa_0 * (kappa_0_lambda/break_lambda)**beta[1]
+            break_nu = c / break_lambda
 
-    # Calculate Planck function prefactor for each frequency
-    B_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
+            # Now calculate kappa either side of the break
+            short_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
+            short_kappa_nu_prefactor = np.power(short_kappa_nu_base, beta[0])
+            short_kappa_nu = kappa_break_lambda * short_kappa_nu_prefactor
+            long_kappa_nu_base = np.outer(break_nu**-1, nu)[0,:]
+            long_kappa_nu_prefactor = np.power(long_kappa_nu_base, beta[1])
+            long_kappa_nu = kappa_break_lambda * long_kappa_nu_prefactor
+            kappa_nu = short_kappa_nu.copy()
+            kappa_nu[np.where(wavelength >= break_lambda)] = long_kappa_nu[np.where(wavelength >= break_lambda)]
+            kappa_nu = np.array([kappa_nu]*n_comp)
 
-    # Calculate exponent term in Planck function, for each component, at each frequency
-    B_exponent = np.array([ np.divide((h*nu),(k*temp[m])) for m in range(n_comp) ])
+        # Calculate Planck function prefactor for each frequency
+        B_prefactor = np.divide((2.0 * h * nu**3.0), c**2.0)
 
-    # Calculate final value of Planck function for each, for each model component, at each frequency (output array will have n_comp rows, and n_freq columns)
-    B_planck = B_prefactor * (np.e**B_exponent - 1)**-1.0
+        # Calculate exponent term in Planck function, for each component, at each frequency
+        B_exponent = np.array([ np.divide((h*nu),(k*temp[m])) for m in range(n_comp) ])
 
-    # Convert mass and distance values to SI units
-    mass_kilograms = mass * 2E30
-    dist_metres = dist * 3.26 * 9.5E15
+        # Calculate final value of Planck function for each, for each model component, at each frequency (output array will have n_comp rows, and n_freq columns)
+        B_planck = B_prefactor * (np.e**B_exponent - 1)**-1.0
 
-    # Calculate flux for each component, for each dust model component
-    flux = 0.0
-    for m in range(n_comp):
-        flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
+        # Convert mass and distance values to SI units
+        mass_kilograms = mass * 2E30
+        dist_metres = dist * 3.26 * 9.5E15
+
+        # Calculate flux for each component, for each dust model component
+        flux = 0.0
+        for m in range(n_comp):
+            flux += 1E26 * kappa_nu[m,:] * dist_metres**-2.0 * mass_kilograms[m] * B_planck[m,:]
+
+    # Return -inf if we get an overflow error
+    except Exception as exception_msg:
+        if 'Numerical result out of range' in str(exception_msg):
+            return np.array([-1*np.inf] * n_comp)
+        else:
+            raise Exception()
 
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
@@ -653,7 +667,6 @@ def PriorsConstruct(fit_dict):
     # Use flux and distance to estimate likely cold dust mass, based on empirical relation
     bands_frame = fit_dict['bands_frame']
     fluxes_submm = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux']
-
     peak_flux = fluxes_submm.max()
     if np.isnan(peak_flux):
         peak_flux = bands_frame.loc[np.argmax(bands_frame['wavelength']),'flux']
