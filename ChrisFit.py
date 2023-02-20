@@ -347,7 +347,13 @@ def Fit(gal_dict,
             mcmc_pool.close()
         if verbose:
             print(name_bracket_prefix + 'Processing completed')
-        results_dict = {'medians':median_params,'mle':mle_params,'map':map_params,'corner':corner_fig,'sed':sed_fig,'trace':trace_fig,'chisq':median_chi_squared}
+        results_dict = {'medians':median_params,
+                        'mle':mle_params,
+                        'map':map_params,
+                        'corner':corner_fig,
+                        'sed':sed_fig,
+                        'trace':trace_fig,
+                        'chisq':median_chi_squared}
         if full_posterior:
             results_dict.update({'posterior':mcmc_samples, 'trace':trace_fig})
         return results_dict
@@ -1311,7 +1317,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     bands_frame = bands_frame.loc[np.isnan(bands_frame['flux']) == False]
 
     # Generate fit components
-    fit_wavelengths = np.logspace(-5, -2, num=2000)
+    fit_wavelengths = np.logspace(-5, -1, num=2000)
     fit_fluxes = np.zeros([fit_dict['components'], len(fit_wavelengths)])
     for i in range(fit_dict['components']):
         fit_fluxes[i,:] = ModelFlux(fit_wavelengths, temp_vector[i], mass_vector[i], fit_dict['distance'],
@@ -1358,7 +1364,8 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         ax.errorbar(bands_frame['wavelength']*1E6, flux_plot, yerr=[errorbar_down, errorbar_up], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
     else:
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
-        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']], yerr=[errorbar_down[bands_frame['limit']], errorbar_up[bands_frame['limit']]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+        ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']==True], yerr=[errorbar_down[bands_frame['limit']==True], errorbar_up[bands_frame['limit']==True]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
+
 
 
 
@@ -1367,7 +1374,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         post = posterior[np.random.choice(range(posterior.shape[0]), size=min(2000,posterior.shape[0]), replace=False), :]
 
         # Generate SEDs for each sample of the thinned posterior, for individual components and for combined model
-        post_wavelengths = np.logspace(-5, -2, num=500)
+        post_wavelengths = np.logspace(-5, -1, num=500)
         post_fluxes_indv = np.zeros([post.shape[0], post_wavelengths.shape[0], fit_dict['components']])
         post_fluxes_tot = np.zeros([post.shape[0], post_wavelengths.shape[0]])
         for i in range(fit_dict['components']):
@@ -1420,7 +1427,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
         # Generate fit components for this "median model"
         med_temp_vector, med_mass_vector, med_beta_vector, med_correl_err_vector = ParamsExtract(med_params, med_fit_dict)
-        med_fit_wavelengths = np.logspace(-5, -2, num=2000)
+        med_fit_wavelengths = np.logspace(-5, -1, num=2000)
         med_fit_fluxes = np.zeros([med_fit_dict['components'], len(fit_wavelengths)])
         for i in range(med_fit_dict['components']):
             med_fit_fluxes[i,:] = ModelFlux(med_fit_wavelengths, med_temp_vector[i], med_mass_vector[i], med_fit_dict['distance'],
