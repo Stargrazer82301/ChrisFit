@@ -1,13 +1,12 @@
 # Import smorgasbord
 from __future__ import print_function
-import pdb
 import sys
 import os
 import copy
-import dill
 import re
 import gc
 import warnings
+import time
 warnings.filterwarnings('ignore')
 from difflib import SequenceMatcher
 import multiprocessing as mp
@@ -25,6 +24,7 @@ import matplotlib.ticker
 import seaborn as sns
 import sklearn.neighbors
 import progress.bar
+import signal
 import termcolor
 import acor
 import corner
@@ -205,9 +205,28 @@ def FitBEMBB(gal_dict,
         if map_only:
             print(name_bracket_prefix + 'Performing maximum likelihood estimation')
         else:
-            print(name_bracket_prefix + 'Performing MLE to initialise MaP estimation')
+            print(name_bracket_prefix + 'Performing MLE to initialise MCMC')
     NegLnLike = lambda *args: -LnLike(*args)
-    mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':5000,'maxfev':5000})
+    """mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell',
+                                      tol=1E-5, options={'maxiter':5000,'maxfev':5000,'return_all':True})"""
+    mle_bounds = np.array([[5, 50],
+                           [mle_initial[1]/1000.0, mle_initial[1]*1000.0],
+                           [0, 4],
+                           [0, 3],
+                           [250E-6, 300E-6]]) #!!! [100E-6, 600E-6]
+    mle_done = False
+    mle_fail_count = 0
+    while not mle_done:
+        try:
+            signal.alarm(600)
+            mle_opt = scipy.optimize.differential_evolution(NegLnLike, mle_bounds,
+                                                            maxiter=250, popsize=5, polish=False,
+                                                            seed=int(time.time()), args=(mle_fit_dict,))
+            signal.alarm(0)
+            mle_done = True
+        except:
+            if mle_fail_count == 5:
+                breakpoint()
     mle_params = mle_opt.x
 
     # If only MLE fit was requested, return results now
@@ -226,23 +245,31 @@ def FitBEMBB(gal_dict,
         return {'mle':mle_params,'sed':sed_fig,'chisq':chi_squared}
 
     # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
-    mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
+    mle_params = np.array(mle_params.tolist()+([1E-5]*len(fit_dict['correl_unc'])))
 
     # Find Maximum A posteriori (MAP) estimate
-    if verbose:
+    """if verbose:
         if map_only:
             print(name_bracket_prefix + 'Performing maximum-a-posteriori estimation')
         else:
             print(name_bracket_prefix + 'Performing MaP estimation to initialise MCMC')
     NegLnLike = lambda *args: -LnPost(*args)
-
-    map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-3, options={'maxiter':2500,'maxfev':2500})
+    map_bounds = np.array([[5, 100],
+                           [mle_initial[1]/1E10, mle_initial[1]*1E10],
+                           [0, 10],
+                           [0, 10],
+                           [50E-6, 1000E-6],
+                           [-0.25, 0.25],
+                           [-0.2, 0.2]])
+    map_opt = scipy.optimize.differential_evolution(NegLnLike, map_bounds, args=(fit_dict,),
+                                                    strategy='rand2bin', maxiter=250, popsize=5)
     if map_opt['success'] == True:
         map_params = map_opt.x
     else:
-        map_params = mle_params
+        map_params = mle_params"""
+    map_params = mle_params
 
-    # If only MAP fit was requested, return results now (with SED plot if needed)
+    """# If only MAP fit was requested, return results now (with SED plot if needed)
     if map_only:
         if map_opt['success'] == False:
             raise Exception('MaP estimation failed; uncertainties may be too small?')
@@ -255,7 +282,7 @@ def FitBEMBB(gal_dict,
                 sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
             else:
                 sed_fig.savefig(gal_dict['name']+'_SED.png', dpi=300)
-        return {'map':map_params,'sed':sed_fig,'chisq':chi_squared}
+        return {'map':map_params,'sed':sed_fig,'chisq':chi_squared}"""
 
     # Generate starting position for MCMC walkers, in small random cluster around maximum-likelihood position
     mcmc_initial = MCMCInitial(map_params, fit_dict)
@@ -580,6 +607,8 @@ def ModelFlux(wavelength, temp, mass, dist, kappa_0=0.051, kappa_0_lambda=500E-6
     # Return calculated flux (denumpifying it if is only single value)
     if flux.size == 0:
         flux = flux[0]
+    else:
+        flux = flux.astype(float)
     if len(flux.shape) == 2:
         flux = flux[0,:]
     return flux
@@ -882,13 +911,17 @@ def MaxLikeBounds(params, fit_dict):
     if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
         return False
 
+
+    if beta_vector[0] < beta_vector[1]: #!!!
+        return False#!!!
+
+
     # Check that break_lambda value is reasonable (ie, 100um < break_lambda < 1000um)
     if (break_lambda_vector[0] < 100E-6) or (break_lambda_vector[0] > 1000E-6):
         return False
 
     # If we've gotten this far, then everything is fine
     return True
-
 
 
 
