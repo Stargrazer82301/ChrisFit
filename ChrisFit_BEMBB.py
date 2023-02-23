@@ -1330,10 +1330,9 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Create flux and error columns, for plotting with
     flux_plot = bands_frame['flux_corr'].values.copy()
     error_plot = bands_frame['error'].values.copy()
-    errorbar_up, errorbar_down = bands_frame['error'].values, bands_frame['error'].values.copy()
+    errorbar_up, errorbar_down = bands_frame['error'].values.copy(), bands_frame['error'].values.copy()
 
-    # Format errorbar sizes deal with negative fluxes
-    errorbar_up[np.where(flux_plot <= 0)] = flux_plot[np.where(flux_plot <= 0)] + errorbar_up[np.where(flux_plot <= 0)]
+    # Deal with negative fluxes
     flux_plot[np.where(flux_plot <= 0)] = 1E-50
 
     # Format errobars to account for non-detections

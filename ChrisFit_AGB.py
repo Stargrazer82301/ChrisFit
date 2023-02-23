@@ -661,8 +661,8 @@ def PriorsConstruct(fit_dict):
 
     # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
     temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
-    temp_mode = np.linspace(40.0, 50.0, num=fit_dict['components'])
-    temp_phi = np.linspace(20.0, 15.0, num=fit_dict['components'])
+    temp_mode = np.linspace(30.0, 50.0, num=fit_dict['components'])
+    temp_phi = np.linspace(15.0, 15.0, num=fit_dict['components'])
     for i in range(fit_dict['components']):
         temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
         #temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
@@ -1354,10 +1354,9 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     # Create flux and error columns, for plotting with
     flux_plot = bands_frame['flux_corr'].values.copy()
     error_plot = bands_frame['error'].values.copy()
-    errorbar_up, errorbar_down = bands_frame['error'].values, bands_frame['error'].values.copy()
+    errorbar_up, errorbar_down = bands_frame['error'].values.copy(), bands_frame['error'].values.copy()
 
-    # Format errorbar sizes deal with negative fluxes
-    errorbar_up[np.where(flux_plot <= 0)] = flux_plot[np.where(flux_plot <= 0)] + errorbar_up[np.where(flux_plot <= 0)]
+    # Deal with negative fluxes
     flux_plot[np.where(flux_plot <= 0)] = 1E-50
 
     # Format errobars to account for non-detections
@@ -1369,7 +1368,6 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     else:
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']==False]*1E6, flux_plot[bands_frame['limit']==False], yerr=[errorbar_down[bands_frame['limit']==False], errorbar_up[bands_frame['limit']==False]], ecolor='black', elinewidth=1.5, capthick=0, marker='x', color='black', markersize=6.25, markeredgewidth=1.5, linewidth=0)
         ax.errorbar(bands_frame['wavelength'][bands_frame['limit']]*1E6, flux_plot[bands_frame['limit']==True], yerr=[errorbar_down[bands_frame['limit']==True], errorbar_up[bands_frame['limit']==True]], ecolor='gray', elinewidth=1.5, capthick=0, marker='x', color='gray', markersize=6.25, markeredgewidth=1.5, linewidth=0)
-
 
 
 
