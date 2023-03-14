@@ -190,7 +190,7 @@ def FitBEMBB(gal_dict,
     else:
         if verbose and (True not in [mle_only, map_only]):
             print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
-
+            fit_dict['priors'] = PriorsConstruct(fit_dict)
 
     # Generate initial guess values for maximum-likelihood estimation and maximum-a-posteriori estimation (which will then itself be used to initialise emcee's estimation)
     mle_fit_dict = copy.deepcopy(fit_dict)

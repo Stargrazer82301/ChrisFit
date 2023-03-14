@@ -197,8 +197,8 @@ def Fit(gal_dict,
             fit_dict['priors'] = PriorsConstruct(fit_dict)
         else:
             if verbose and (True not in [mle_only, map_only]):
-                print(name_bracket_prefix  + 'No custom priors provided; using (slower) default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
-
+                print(name_bracket_prefix  + 'No custom priors provided; using default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
+                fit_dict['priors'] = PriorsConstruct(fit_dict)
 
         # Generate initial guess values for maximum-likelihood estimation and maximum-a-posteriori estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
@@ -649,14 +649,14 @@ def PriorsConstruct(fit_dict):
 
     # Provide dictionary of flat priors
     priors = {'temp':[], 'mass':[], 'beta':[]}
-    """for i in range(fit_dict['components']):
-        priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 35) else 1E-10))
+    for i in range(fit_dict['components']):
+        priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 5.0) else 1E-10))
         priors['mass'].append(lambda mass, mass_like_norm=1.0: ((0.0*mass*mass_like_norm) + 1.0))
         if fit_dict['beta_vary']:
-            priors['beta'].append(lambda beta, beta_like_norm=1.0: ((0.0*beta*beta_like_norm) + 1.0))
-    return priors"""
+            priors['beta'].append(lambda beta, beta_like_norm=1.0: ((0.0*beta*beta_like_norm) + 1.0)* (1.0 if ((beta > 0.0) & (beta < 3)) else 1E-10))
+    return priors
 
-    # Define function to find scaling factor for gamma distribution of given mode, alpha, and location
+    """# Define function to find scaling factor for gamma distribution of given mode, alpha, and location
     GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
 
     # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
@@ -713,7 +713,7 @@ def PriorsConstruct(fit_dict):
             priors['beta'].append(beta_ln_like)
 
     # Return priors dictionary
-    return priors
+    return priors"""
 
 
 
@@ -1349,8 +1349,6 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
                                                kappa_0=fit_dict['kappa_0'], kappa_0_lambda=fit_dict['kappa_0_lambda'], verbose=False)
         bands_frame.loc[b,'flux_corr'] = bands_frame.loc[b,'flux'] * colour_corr_factor
 
-
-
     # Create flux and error columns, for plotting with
     flux_plot = bands_frame['flux_corr'].values.copy()
     error_plot = bands_frame['error'].values.copy()
@@ -1518,7 +1516,10 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         flux_where_pos = np.where(flux_plot > 0)
         ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[flux_where_pos] / 2.0 ) ) ) )
         ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot + error_plot ) ) ) )
-    ax.set_ylim(ylim_min,ylim_max)
+    try:
+        ax.set_ylim(ylim_min,ylim_max)
+    except:
+        breakpoint()
 
     # Format figure axes and labels
     ax.set_xscale('log')
