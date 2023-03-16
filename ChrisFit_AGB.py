@@ -198,7 +198,6 @@ def Fit(gal_dict,
         else:
             if verbose and (True not in [mle_only, map_only]):
                 print(name_bracket_prefix  + 'No custom priors provided; using default priors') #(Note that the multithreaded MCMC is *MUCH FASTER* when working with custom priors, as functions defined outsite the fitter can be handled more efficiently)
-                fit_dict['priors'] = PriorsConstruct(fit_dict)
 
         # Generate initial guess values for maximum-likelihood estimation and maximum-a-posteriori estimation (which will then itself be used to initialise emcee's estimation)
         mle_fit_dict = copy.deepcopy(fit_dict)
@@ -333,7 +332,7 @@ def Fit(gal_dict,
         if plot != False:
             if verbose:
                 print(name_bracket_prefix + 'Generating SED plot')
-            sed_fig, sed_ax = SEDborn(median_params, fit_dict, posterior=mcmc_samples)
+            sed_fig, sed_ax = SEDborn(mle_params, fit_dict, posterior=mcmc_samples)
             if isinstance(plot, str):
                 sed_fig.savefig(os.path.join(plot,gal_dict['name']+'_SED.png'), dpi=300)
             else:
@@ -647,73 +646,32 @@ def PriorsConstruct(fit_dict):
     if fit_dict['priors'] != None:
         return fit_dict['priors']
 
-    # Provide dictionary of flat priors
+    # Create dictionary to store functions for priors
     priors = {'temp':[], 'mass':[], 'beta':[]}
+
+    # Provide flat priors for mass and beta
     for i in range(fit_dict['components']):
-        priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 5.0) else 1E-10))
-        priors['mass'].append(lambda mass, mass_like_norm=1.0: ((0.0*mass*mass_like_norm) + 1.0))
+        #priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 15.0) else -1E50))
+        priors['mass'].append(lambda mass, mass_like_norm=1.0: ((0.0*mass*mass_like_norm) + 1.0) * (1.0 if (mass <= 1E10) else -1E50))
         if fit_dict['beta_vary']:
-            priors['beta'].append(lambda beta, beta_like_norm=1.0: ((0.0*beta*beta_like_norm) + 1.0)* (1.0 if ((beta > 0.0) & (beta < 3)) else 1E-10))
-    return priors
+            priors['beta'].append(lambda beta, beta_like_norm=1.0: ((0.0*beta*beta_like_norm) + 1.0) * (1.0 if ((beta > -1.0) & (beta < 4.0)) else -1E50))
 
-    """# Define function to find scaling factor for gamma distribution of given mode, alpha, and location
-    GammaScale = lambda mode, alpha, phi: (mode-phi)/(alpha-1.0)
-
-    # Create temperature priors, using gamma distribution (with kwarg in lambda to make iterations evaluate separately)
-    temp_alpha = np.linspace(2.5, 3.0, num=fit_dict['components'])
-    temp_mode = np.linspace(30.0, 50.0, num=fit_dict['components'])
-    temp_phi = np.linspace(15.0, 15.0, num=fit_dict['components'])
+    # Create temperature prior, using trapezoid distribution
+    temp_c = 0.0135
+    temp_d = 0.728
+    temp_loc = 15.0
+    temp_scale = 185.0
     for i in range(fit_dict['components']):
-        temp_scale = GammaScale(temp_mode[i],temp_alpha[i],temp_phi[i])
-        #temp_ln_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: np.log(scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale))
-        temp_like = lambda temp, temp_alpha=temp_alpha[i], temp_phi=temp_phi[i], temp_scale=temp_scale: scipy.stats.gamma.pdf(temp, temp_alpha, loc=temp_phi, scale=temp_scale)
-        temp_x = np.linspace(0, 500, num=1000)
+        temp_like = lambda temp: scipy.stats.trapezoid.pdf(temp, temp_c, temp_d, loc=temp_loc, scale=temp_scale)
+        temp_x = np.linspace(0, 250, num=1000)
         temp_y = temp_like(temp_x)
         temp_norm = np.trapz(temp_y, x=temp_x)
         temp_like_norm = lambda temp, temp_like=temp_like, temp_norm=temp_norm: temp_like(temp) / temp_norm
         temp_ln_like = lambda temp, temp_like_norm=temp_like_norm: np.log(temp_like_norm(temp))
         priors['temp'].append(temp_ln_like)
 
-    # Use flux and distance to estimate likely cold dust mass, based on empirical relation
-    bands_frame = fit_dict['bands_frame']
-    fluxes_submm = bands_frame.where((bands_frame['wavelength']>=150E-6)&(bands_frame['wavelength']<1E-3))['flux']
-    peak_flux = fluxes_submm.max()
-    if np.isnan(peak_flux):
-        peak_flux = bands_frame.loc[np.argmax(bands_frame['wavelength']),'flux']
-    peak_lum = peak_flux * fit_dict['distance']**2.0
-    peak_mass = 10**(np.log10(peak_lum)-8)
-
-    # Use likely cold dust mass to construct mass priors, using log-t distribution (with kwarg in lambda to make iterations evaluate separately)
-    mass_mode = np.array([peak_mass] * fit_dict['components'])
-    mass_mode *= 0.051 / (fit_dict['kappa_0'] * (fit_dict['kappa_0_lambda'] / 500E-6)**fit_dict['beta'][0])
-    mass_mode *= 10**((temp_mode-temp_mode[0])/-15)
-    mass_mode = np.log10(mass_mode)
-    mass_sigma = np.array([10.0] * fit_dict['components'])
-    for i in range(fit_dict['components']):
-        #mass_ln_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: np.log(10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma))
-        mass_like = lambda mass, mass_mode=mass_mode[i], mass_sigma=mass_sigma[i]: 10.0**scipy.stats.t.pdf(np.log10(mass), 1, loc=mass_mode, scale=mass_sigma)
-        mass_x = np.logspace(-10, 20, num=10000)
-        mass_y = mass_like(mass_x)
-        mass_norm = np.trapz(mass_y, x=mass_x)
-        mass_like_norm = lambda mass, mass_like=mass_like, mass_norm=mass_norm: mass_like(mass) / mass_norm
-        mass_ln_like = lambda mass, mass_like_norm=mass_like_norm: np.log(mass_like_norm(mass))
-        priors['mass'].append(mass_ln_like)
-
-    # Create beta priors, using gamma distribution
-    if fit_dict['beta_vary']:
-        for i in range(len(fit_dict['beta'])):
-            #beta_ln_like = lambda beta: np.log(scipy.stats.gamma.pdf(beta, 3.00, loc=0, scale=1))
-            beta_mode = fit_dict['beta'][i]
-            beta_like = lambda beta: scipy.stats.gamma.pdf(beta, beta_mode+1.0, loc=0, scale=1)
-            beta_x = np.linspace(0, 20, num=2000)
-            beta_y = beta_like(beta_x)
-            beta_norm = np.trapz(beta_y, x=beta_x)
-            beta_like_norm = lambda beta, beta_like=beta_like: beta_like(beta) / beta_norm
-            beta_ln_like = lambda beta, beta_like_norm=beta_like_norm: np.log(beta_like_norm(beta))
-            priors['beta'].append(beta_ln_like)
-
-    # Return priors dictionary
-    return priors"""
+    # Return priors
+    return priors
 
 
 
@@ -1355,7 +1313,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
     errorbar_up, errorbar_down = bands_frame['error'].values.copy(), bands_frame['error'].values.copy()
 
     # Deal with negative fluxes
-    flux_plot[np.where(flux_plot <= 0)] = 1E-50
+    flux_plot[np.where(flux_plot <= 0)] = 0.1 * error_plot[np.where(flux_plot <= 0)]
 
     # Format errobars to account for non-detections
     errorbar_down[np.where(errorbar_down > flux_plot)] = 0.99999 * flux_plot[np.where(errorbar_down > flux_plot)]
@@ -1398,47 +1356,10 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         lim_fluxes_tot[0,:] = np.percentile(post_fluxes_tot, 16, axis=0)
         lim_fluxes_tot[1,:] = np.percentile(post_fluxes_tot, 84, axis=0)
 
-        # Work out the median flux at a large number of closely-spaced wavelength intervals
-        med_wavelengths = post_wavelengths[::5]
-        med_fluxes_tot = np.median(post_fluxes_tot, axis=0)[::5]
-        med_scatter_tot = np.std(post_fluxes_tot, axis=0)[::5]
-        med_fit_dict = copy.deepcopy(fit_dict)
-        med_fit_dict['bounds'] = True
-
-        # Take the fluxes at the small wavelength intervals, and create a fit_dict with them
-        med_bands_frame = pd.DataFrame(columns=fit_dict['bands_frame'].columns)
-        for i in range(len(med_fluxes_tot)-1):
-            med_bands_frame.loc[i,'band'] = 'SLICE'+str(int(round(med_wavelengths[i]*1E6)))
-            med_bands_frame.loc[i,'wavelength'] = med_wavelengths[i]
-            med_bands_frame.loc[i,'flux'] = med_fluxes_tot[i]
-            med_bands_frame.loc[i,'error'] = med_scatter_tot[i]
-            med_bands_frame.loc[i,'limit'] = False
-            med_bands_frame.loc[i,'det'] = True
-        med_bands_frame.loc[:,'wavelength'] = med_bands_frame['wavelength'].astype(float)
-        med_bands_frame.loc[:,'flux'] = med_bands_frame['flux'].astype(float)
-        med_bands_frame.loc[:,'error'] = med_bands_frame['error'].astype(float)
-        med_fit_dict['bands_frame'] = med_bands_frame
-        med_initial = params.copy()
-
-        # Fit a model to the median fluxes in each small interval of wavelength
-        NegLnLike = lambda *args: -LnLike(*args)
-        med_opt = scipy.optimize.minimize(NegLnLike, med_initial, args=(med_fit_dict), method='Powell', options={'maxiter':500})
-        med_params = med_opt.x
-
-        # Generate fit components for this "median model"
-        med_temp_vector, med_mass_vector, med_beta_vector, med_correl_err_vector = ParamsExtract(med_params, med_fit_dict)
-        med_fit_wavelengths = np.logspace(-5, -1, num=2000)
-        med_fit_fluxes = np.zeros([med_fit_dict['components'], len(fit_wavelengths)])
-        for i in range(med_fit_dict['components']):
-            med_fit_fluxes[i,:] = ModelFlux(med_fit_wavelengths, med_temp_vector[i], med_mass_vector[i], med_fit_dict['distance'],
-                                        kappa_0=med_fit_dict['kappa_0'], kappa_0_lambda=med_fit_dict['kappa_0_lambda'], beta=med_beta_vector[i])
-        med_fit_fluxes_tot = np.sum(med_fit_fluxes, axis=0)
-        temp_vector, mass_vector, beta_vector = med_temp_vector, med_mass_vector, med_beta_vector
-
-        # Plot "median model"
-        for i in range(med_fit_dict['components']):
-            ax.plot(med_fit_wavelengths*1E6, med_fit_fluxes[i,:], ls='--', lw=1.0, c='black')
-        ax.plot(med_fit_wavelengths*1E6, med_fit_fluxes_tot, ls='-', lw=1.5, c='red')
+        # Plot MAP model
+        for i in range(fit_dict['components']):
+            ax.plot(fit_wavelengths*1E6, fit_fluxes[i,:], ls='--', lw=1.0, c='black')
+        ax.plot(fit_wavelengths*1E6, fit_fluxes_tot, ls='-', lw=1.5, c='red')
 
         """# Plot shaded regions
         for i in range(fit_dict['components']):
@@ -1516,10 +1437,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
         flux_where_pos = np.where(flux_plot > 0)
         ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[flux_where_pos] / 2.0 ) ) ) )
         ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot + error_plot ) ) ) )
-    try:
-        ax.set_ylim(ylim_min,ylim_max)
-    except:
-        breakpoint()
+    ax.set_ylim(ylim_min,ylim_max)
 
     # Format figure axes and labels
     ax.set_xscale('log')
