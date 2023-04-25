@@ -214,7 +214,7 @@ def Fit(gal_dict,
             else:
                 print(name_bracket_prefix + 'Performing MLE to initialise MaP estimation')
         NegLnLike = lambda *args: -LnLike(*args)
-        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+        mle_opt = scipy.optimize.minimize(NegLnLike, mle_initial, args=(mle_fit_dict), method='Powell', tol=1E-4, options={'maxiter':100,'maxfev':10000})
         mle_params = mle_opt.x
 
         # If only MLE fit was requested, return results now
