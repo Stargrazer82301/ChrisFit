@@ -856,7 +856,7 @@ def MCMCInitial(mle_params, fit_dict):
                 walker_initial[len(temp_vector):len(temp_vector+mass_vector)] = 10**walker_initial[len(temp_vector):len(temp_vector+mass_vector)]
 
             # Check that beta terms are all physical (ie, beta > 0)
-            if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
+            if (np.where(np.array(beta_vector)<0)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
                 accepted = False
 
         # If proposed position is valid, add it to list of initial conditions
@@ -901,8 +901,8 @@ def MaxLikeBounds(params, fit_dict):
     if np.where(np.array(mass_vector)<0)[0].size > 0:
         return False
 
-    # Check that beta terms are all physical (ie, 1 < beta < 4)
-    if (np.where(np.array(beta_vector)<1)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
+    # Check that beta terms are all physical (ie, 0 < beta < 4)
+    if (np.where(np.array(beta_vector)<0)[0].size > 0) or (np.where(np.array(beta_vector)>4)[0].size > 0):
         return False
 
     # If we've gotten this far, then everything is fine
