@@ -6,6 +6,7 @@ import copy
 import re
 import gc
 import warnings
+import signal
 warnings.filterwarnings('ignore')
 from difflib import SequenceMatcher
 import multiprocessing as mp
@@ -235,15 +236,21 @@ def Fit(gal_dict,
         # Re-introduce any correlated uncertainty parameters that were excluded from maximum-likelihood fit
         mle_params = np.array(mle_params.tolist()+([0.0]*len(fit_dict['correl_unc'])))
 
-        # Find Maximum A posteriori (MAP) estimate
+        """# Find Maximum A posteriori (MAP) estimate
         if verbose:
             if map_only:
                 print(name_bracket_prefix + 'Performing MaP estimation')
             else:
                 print(name_bracket_prefix + 'Performing MaP estimation to initialise MCMC')
         NegLnLike = lambda *args: -LnPost(*args)
-        map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
-        map_params = map_opt.x
+        try:
+            signal.alarm(20)
+            map_opt = scipy.optimize.minimize(NegLnLike, mle_params, args=(fit_dict), method='Powell', tol=1E-5, options={'maxiter':10000,'maxfev':10000})
+            map_params = map_opt.x
+        except:
+            map_params = mle_params.copy()
+        signal.alarm(0)"""
+        map_params = mle_params
 
         # If only MAP fit was requested, return results now (with SED plot if needed)
         if map_only:
@@ -651,7 +658,7 @@ def PriorsConstruct(fit_dict):
 
     # Provide flat priors for mass and beta
     for i in range(fit_dict['components']):
-        #priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 15.0) else -1E50))
+        #priors['temp'].append(lambda temp, temp_like_norm=1.0: ((0.0*temp*temp_like_norm) + 1.0) * (1.0 if (temp >= 5.0) else -1E50))
         priors['mass'].append(lambda mass, mass_like_norm=1.0: ((0.0*mass*mass_like_norm) + 1.0) * (1.0 if (mass <= 1E10) else -1E50))
         if fit_dict['beta_vary']:
             priors['beta'].append(lambda beta, beta_like_norm=1.0: ((0.0*beta*beta_like_norm) + 1.0) * (1.0 if ((beta > -1.0) & (beta < 4.0)) else -1E50))
@@ -1431,7 +1438,7 @@ def SEDborn(params, fit_dict, posterior=False, font_family='sans'):
 
     # Scale y-axes to account for range of values and non-detections
     if sum(bands_frame['det']) > 0:
-        ylim_min = 10.0**( -1.0 + np.round( np.nanmin( np.log10( flux_plot[bands_frame['det']] - error_plot[bands_frame['det']] ) ) ) )
+        ylim_min = 10.0**( -2.0 + np.round( np.nanmin( np.log10( flux_plot[bands_frame['det']] - error_plot[bands_frame['det']] ) ) ) )
         ylim_max = 10.0**( 1.0 + np.ceil( np.log10( 1.1 * np.max( flux_plot[bands_frame['det']] + error_plot[bands_frame['det']] ) ) ) )
     else:
         flux_where_pos = np.where(flux_plot > 0)
